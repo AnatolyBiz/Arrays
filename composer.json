@@ -1,0 +1,27 @@
+{
+    "name": "anatolyklocko/arrays",
+    "description": "A PHP library for work with arrays",
+    "type": "library",
+    "keywords": ["array", "tree", "table", "output"],
+    "homepage": "https://github.com/AnatolyKlochko/Arrays",
+    "time": "2018-01-10",
+    "license": "BSD-2-Clause",
+    "authors": [
+        {
+            "name": "Anatoly S. Klochko",
+            "email": "anatoly.klochko@gmail.com",
+            "homepage": "https://github.com/AnatolyKlochko",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.1.1"
+    },
+    "autoload": {
+        "psr-4": {
+                "Arrays\\": ""
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
