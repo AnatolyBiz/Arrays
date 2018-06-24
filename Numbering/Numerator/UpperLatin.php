@@ -1,14 +1,10 @@
 <?php
 /**
  * NUMBERINGS.
- *
  * For initialize the numbering types array. It is a one of available a numbering types.
  * 
  * Nubmering type "UpperLatin".
- *
- * Example: 
- * A, B, C, .., Y, AZ, AA, AB, .. 
- *
+ * Example: A, B, C, .., Y, AZ, AA, AB, .. 
  * Let's imagine that it is new number system, which has base of 26. Then
  * 'A' is 1, 'B' is 2, ..., 'Y' is 25 and 'Z' is 0 (zero). So, it is 
  * possible to use native PHP function base_convert to get right
