@@ -1,11 +1,11 @@
 <?php
 /**
-  * View (default values).
+  * View (default settings).
   * 
   * Example of a struct elements: 'wrapper', 'block', 'item' and 'content':
-  *      <nav>                                    'wrapper'
-  *          <ul>                                 'block'            (can contain 'item')
-  *              <li>                             'item'             (can contain 'content' and 'block', or can be a wrapper for 'content')
+  *      <nav>                                    'wrapper'          a tag that is wrapper for all tree
+  *          <ul>                                 'block'            (can contains 'item')
+  *              <li>                             'item'             (can contains 'content' and another 'block', or can be just only wrapper for 'content')
   *                  <a href="#"></a>             'content'          (only in 'item')
   *                  <ul>                         'block' in 'item'  (only after 'content')
   *                      <li>                     ...
@@ -30,10 +30,10 @@ return [
         ],
         'wrapper' => '<div>{{}}</div>',
         'level' => [
-            'block'     => '<ul>{{}}</ul>',
-            'item'      => '<li>{{}}</li>',
-            'content'   => '<span data-id="{{' . $src_index . '}}" data-parentid="{{' . $src_parent . '}}">ID {{' . $src_index . '}}</span>'
+            'block'     => '<ul data-level="{{level}}">{{}}</ul>',
+            'item'      => '<li data-next="{{next}}">{{}}</li>',
+            'content'   => '<span>{{}}</span>'
         ]
     ],
-    'replacing_pattern' => '[a-zA-Z0-9%_][a-zA-Z0-9%_]*', // first symbol and next
+    'replacing_pattern' => '[a-zA-Z0-9%_][a-zA-Z0-9%_]*', // [allowed first symbol][and next allowed symbols]*
 ];

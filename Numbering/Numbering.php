@@ -1,12 +1,15 @@
 <?php
 /**
- * 
+ * Arrays Numbering Class
+ *
+ * @package Arrays
+ * @link    https://github.com/AnatolyKlochko/Arrays
+ * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
 namespace Arrays\Numbering;
 
 /**
- * Description of Methods
- *
+ * Helps create numbering.
  *
  */
 class Numbering
@@ -43,6 +46,22 @@ class Numbering
      * @var array
      */
     private $numerator;
+    
+    
+    /** Exceptions */
+    
+    /**
+     * The default exception class.
+     */
+    private $defaultExceptionClass = '\Arrays\Exception\ArraysException';
+    
+    /**
+     * A custom exception class name, which is used for error handling.
+     * 
+     * @access private
+     * @var string
+     */
+    private $exceptionClass;
     
     
     
@@ -89,6 +108,14 @@ class Numbering
     }
     
     /**
+     * Sets a custom exception class.
+     */
+    public function setExceptionClass($exceptionClass)
+    {
+        $this->exceptionClass = $exceptionClass;
+    }
+    
+    /**
      * 
      */
     private function getNumerator(string &$name) : \Closure
@@ -102,13 +129,13 @@ class Numbering
         // has a problems while a loading?
         if (false === $numerator)
         {
-            throw new $this->ExceptionClass('A numerator file \'' . $path . '\' cannot be loaded.');
+            throw new $this->exceptionClass('A numerator file \'' . $path . '\' cannot be loaded.');
         }
         
         // verify the numerator
         if(false === $this->isNumerator($numerator))
         {
-            throw new $this->ExceptionClass('The numerator has errors (review the code of the numerator \''.$path.'\').');
+            throw new $this->exceptionClass('The numerator has errors (review the code of the numerator \''.$path.'\').');
         }
         
         return $numerator;
@@ -127,7 +154,7 @@ class Numbering
             $total_params = 1; // int &$offset
             $num_of_rparams = $refl->getNumberOfRequiredParameters();
             if ($num_of_rparams != $total_params) {
-                throw new $this->ExceptionClass('The numerator method has wrong signature: is passed '.$num_of_rparams.' required parameters, but need - '.$total_params.'.');
+                throw new $this->exceptionClass('The numerator method has wrong signature: is passed '.$num_of_rparams.' required parameters, but need - '.$total_params.'.');
             }
             // parameters types
             $error_message = 'The return type of the numerator or a parameter of the numerator method is wrong (it has not an allowed name or is passed not by reference).';
@@ -136,12 +163,12 @@ class Numbering
             // 'int &$offset' parameter
             $prm = $params[++$pi];
             if (!($prm->getName() === 'offset' && $prm->isPassedByReference() && $prm->hasType() && $prm->getType()->getName() == 'int')) {
-                throw new $this->ExceptionClass($error_message);
+                throw new $this->exceptionClass($error_message);
             }
             
             // closure
             if (!($refl->hasReturnType() && $refl->getReturnType()->getName() == 'string')) {
-                throw new $this->ExceptionClass($error_message);
+                throw new $this->exceptionClass($error_message);
             }
             
             // all a numerator parameters is valid
@@ -149,7 +176,7 @@ class Numbering
         }
         
         // glaring mistake: $numerator is not a function
-        throw new $this->ExceptionClass('The passed numerator is not a function.');
+        throw new $this->exceptionClass('The passed numerator is not a function.');
     }
         
     /**
