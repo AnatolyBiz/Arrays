@@ -2,13 +2,13 @@
 namespace Arrays\D2\Tree\View;
 
 /**
- * Used for a computing of expressions within a node string.
+ * .
  * 
  * @package Arrays
  * @link    https://github.com/AnatolyKlochko/Arrays
- * @author Anatoly Klochko <anatoly.klochko@gmail.com>
+ * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
-class OutputReplacer extends \stdClass
+class Replacer extends \stdClass
 {
     public $replacer;
     

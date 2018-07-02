@@ -4,7 +4,7 @@
  *
  * @package Arrays
  * @link    https://github.com/AnatolyKlochko/Arrays
- * @author Anatoly Klochko <anatoly.klochko@gmail.com>
+ * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
 namespace Arrays\Option;
 

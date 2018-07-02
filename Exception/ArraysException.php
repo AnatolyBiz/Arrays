@@ -14,7 +14,7 @@ namespace Arrays\Exception;
  * @link    https://github.com/AnatolyKlochko/Arrays
  * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
-class ArraysException extends \LogicException
+class ArraysException extends \Exception
 {
     
 }

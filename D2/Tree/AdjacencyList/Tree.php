@@ -11,6 +11,8 @@
  */
 namespace Arrays\D2\Tree\AdjacencyList;
 
+use Arrays\D2\Tree\AdjacencyList\Option;
+
 /**
  * The Tree class implements helpful methods for building and outputting two-dimensional 
  * arrays (calling trees).
@@ -117,7 +119,6 @@ class Tree
     private $levels = 0;
     
     
-    
     /** Flags */
         
     /**
@@ -146,41 +147,24 @@ class Tree
      * @var bool
      */
     private $is_relation_next = false;
+        
     
-    
-    
-    /** Debug */
+    /** Exceptions */
     
     /**
-     * Turns on/off debug mode.
-     * 
-     * @access private
-     * @var bool
+     * The default exception class.
      */
-    private $fdebug_mode;
+    private $defaultExceptionClass = '\Arrays\Exception\ArraysException';
     
     /**
-     * A string with node's id's separated with dots, something like: '22.18.15'.
-     * It has a next helpful sense: last 'id' is a node's id, that has a wrong 
-     * 'parent' value.
-     * '...dc_rbranch' means Descendant Counting Reversed Branch.
+     * A custom exception class name, which is used for error handling.
      * 
      * @access private
      * @var string
      */
-    private $debug_dc_rbranch;
+    private $exceptionClass;
     
-    /**
-     * An exception class name, which is used while error arise.
-     * 
-     * @access private
-     * @var string
-     */
-    private $ExceptionClass;
     
-
-    
-    /** INITIALIZING */
     
     /**
      * Initializes the tree properties (like a source array, index column, parent
@@ -195,135 +179,34 @@ class Tree
     {
         // PHP Version, min 7.1.1
         if (version_compare(PHP_VERSION, '7.1.1') == -1) {
-            echo '\'' . __CLASS__ . '\' class requires PHP version at least 7.1.1. Your current PHP version is ' . phpversion(); exit;
+            echo '\'' . __CLASS__ . '\' class requires PHP version at least 7.1.1. Your current PHP version is ' . phpversion();
+            exit;
         }
         
-        // error handling
-        $this->ExceptionClass = '\\LogicException';
-        
+        // error handling ( Note: setSource method uses getExceptionClass method which uses $exceptionClass property)
+        $this->exceptionClass = $this->defaultExceptionClass;
+                
         // save source
-        $this->source($source, $src_index, $src_parent, $top_ident);
+        $this->setSource($source, $src_index, $src_parent, null, $top_ident);
         
         // options
-        $this->options = new Option($options, $src_index, $src_parent);
-        
-        
-        
-        /**
-         * Output (default values).
-         * 
-         * Example of a struct elements: 'wrapper', 'block', 'item' and 'content':
-         *      <nav>                                    'wrapper'
-         *          <ul>                                 'block'            (can contain 'item')
-         *              <li>                             'item'             (can contain 'content' and 'block', or can be a wrapper for 'content')
-         *                  <a href="#"></a>             'content'          (only in 'item')
-         *                  <ul>                         'block' in 'item'  (only after 'content')
-         *                      <li>                     ...
-         *                          <a href=""></a>
-         *                      </li>
-         *                  </ul>
-         *              </li>
-         *          </ul>
-         *      </nav>
-         * Splitters: '{{' and '}}' (in fact, they can be any else You will set).
-         * If start and end separator written together - '{{}}', it means they 
-         * are a splitter of element (wrapper, block, item) for start and end an element part.
-         * If they written around one indivisible word, it means they are a replacement and
-         * word among them is a column name of $tree array (while tree will be outputting
-         * that expression will replace with column value) or a computing expression.
-         */
-        $this->view = [
-            'splitter' => ['start' => '{{', 'end' => '}}'], // yeah, a la Angular, why not...
-            'wrapper' => '<div>{{}}</div>',
-            'level' => [
-                'block' => '<ul>{{}}</ul>',
-                'item' => '<li>{{}}</li>',
-                'content' => '<a href="#">node id: \'{{' . $this->src_index . '}}\', parent id: \'{{' . $this->src_parent . '}}\'</a>'
-           ]
-        ];
-        $this->default_block = $this->view['level']['block'];
-        $this->default_item = $this->view['level']['item'];
-        
-        // create pattern to replace column expression with column value
-        $this->replacing_pattern = $this->getReplacingPattern(
-            $this->view['splitter']['start'],
-            $this->view['splitter']['end']
-        );
-        
-        // chaining
-        //return $this; // returns new object by default
+        if ($options != 0)
+            $this->options = new Option($this, $options);
     }
-    
-    public function __call($name, $arguments)
+    public function __get($name)
     {
-        ;
-    }
-    
-    
-    /**
-     * HELPER METHODS  (used by MAIN LOGIC methods)
-     */
-    
-    /**
-     * Returns the current raw tree.
-     * 
-     * @return null|array
-     */
-    public function get()
-    {
-        return $this->tree;
-    }
-    
-    /**
-     * Returns the current raw tree.
-     * 
-     * @return null|array
-     */
-    public function getCurrent()
-    {
-        return $this->get();
-    }
-    
-    /**
-     * 
-     */
-    private function verifySource(array &$source, $src_index, $src_parent, $src_next = null) : bool
-    {
-        // make sure the source array is not empty
-        if (!is_array($source) || (count($source) == 0)) {
-            throw new $this->ExceptionClass('The source array is wrong.');
+        if ($name == 'options') {
+            $this->options = new Option($this, 0);
+            return $this->options;
         }
-
-        // make sure that 'index' and 'parent' columns exist in the source array
-        foreach ($source as &$first_row) {
-            // make sure that the 'index' column exists in source array
-            if (!array_key_exists($src_index, $first_row)) { // searches $key in first $row-array of source $array
-                throw new $this->ExceptionClass('The source array has no the \'index\' column \''.$src_index.'\'.');
-            }
-            // the 'index' column exists, save it to 'this'
-            $this->src_index = $src_index;
-
-            // make sure that the 'parent' column exists in source array
-            if (!array_key_exists($src_parent, $first_row)) { // searches $key in first $row-array of source $array
-                throw new $this->ExceptionClass('The source array has no \'parent\' column \'' . $src_parent . '\'.');
-            }
-            // the 'parent' column exists, save it to 'this'
-            $this->src_parent = $src_parent;
-            
-            // make sure that the 'next' column exists in source array
-            if ($src_next != null) {
-                if (!array_key_exists($src_next, $first_row)) { // searches $key in first $row-array of source $array
-                    throw new $this->ExceptionClass('The source array has no the \'next\' column \''.$src_next.'\'.');
-                }
-                // the 'next' column exists, save it to 'this'
-                $this->src_next = $src_next;
-            }
-            
-            // leave loop
-            break;
-        }
+    }
         
-        return true;
+    /**
+     * Wrapper of 'source' method.
+     */
+    public function getSource()
+    {
+        return $this->source;
     }
     
     /**
@@ -334,85 +217,131 @@ class Tree
      * @param mixed     $src_parent     A column name (or index) which contains values of parent nodes.
      * @param mixed     $top_ident      A value to detect a top node.
      */
-    public function source(array &$source = null, $src_index = null, $src_parent = null, $top_ident = '0')
+    public function setSource(array &$source = null, $src_index = null, $src_parent = null, $src_next = null, $top_ident = '0')
     {
-        if (is_null($source)) {
-            return $this->source;
-        } else {
-            // Copy data from previous tree, if it exists
-            if (empty($src_index) && ! empty($this->src_index)) {
-                $src_index = $this->src_index;
-            }
-            if (empty($src_parent) && ! empty($this->src_parent)) {
-                $src_parent = $this->src_parent;
-            }
-            
-            // #0. verify and assing a new source array:
-            $this->verifySource($source, $src_index, $src_parent);
-
-            // #1. keep options, view, replacers
-
-            // #2. release flags:
-            $this->top_id = null;
-            $this->is_base = false;
-            $this->is_relation_child_sibling = false;
-            $this->is_relation_next = false;
-
-            // #3. release memory
-            if (isset($this->tree)) {
-                unset($this->tree);
-            }
-            if (isset($this->sorted)) {
-                unset($this->sorted);
-            }
-
-            // #4. a determinator of a top node
-            $this->top_ident = $top_ident; // top's determinator
-
-            // #5. the source array is proved, save to 'this'
-            $this->source = &$source;
+        // Copy data from previous tree, if it exists
+        if (empty($src_index) && ! empty($this->src_index)) {
+            $src_index = $this->src_index;
         }
-    }
-    
-    /**
-     * Wrapper of 'source' method.
-     */
-    public function setSource(...$params)
-    {
-        $this->source(...$params);
-    }
-    
-    /**
-     * Wrapper of 'source' method.
-     */
-    public function getSource()
-    {
-        return $this->source();
+        if (empty($src_parent) && ! empty($this->src_parent)) {
+            $src_parent = $this->src_parent;
+        }
+
+        // #1. verify and assing a new source array:
+        $this->verifySource($source, $src_index, $src_parent);
+        $this->src_index = $src_index;
+        $this->src_parent = $src_parent;
+        $this->src_next = $src_next;
+        
+        // #2. release flags:
+        $this->top_id = null;
+        $this->is_base = false;
+        $this->is_relation_child_sibling = false;
+        $this->is_relation_next = false;
+
+        // #3. release memory
+        if (isset($this->tree)) {
+            unset($this->tree);
+        }
+        if (isset($this->sorted)) {
+            unset($this->sorted);
+        }
+
+        // #4. a determinator of a top node
+        $this->top_ident = $top_ident; // top's determinator
+
+        // #5. the source array is proved, save to 'this'
+        $this->source = &$source;
     }
     
     /**
      * 
      */
-    public function setAsBuild(array &$source, $src_index, $src_parent, $src_next, $top_ident = '0')
+    private function verifySource(array &$source, $src_index, $src_parent, $src_next = null) : bool
     {
-        // verify the source array
-        $this->verifySource($source, $src_index, $src_parent, $src_next);
+        // make sure the source array is not empty
+        if (! is_array($source) || (count($source) == 0)) {
+            throw new $this->exceptionClass('The source array is wrong (is empty or is not array at all).');
+        }
+
+        // make sure that 'index' and 'parent' columns exist in the source array
+        foreach ($source as &$first_row) {
+            // make sure that the 'index' column exists in source array
+            if (! array_key_exists($src_index, $first_row)) { // searches $key in first $row-array of source $array
+                throw new $this->exceptionClass('The source array has no the \'index\' column \''.$src_index.'\'.');
+            }
+          
+            // make sure that the 'parent' column exists in source array
+            if (! array_key_exists($src_parent, $first_row)) { // searches $key in first $row-array of source $array
+                throw new $this->exceptionClass('The source array has no \'parent\' column \'' . $src_parent . '\'.');
+            }
+          
+            // make sure that the 'next' column exists in source array
+            if ($src_next != null) {
+                if (! array_key_exists($src_next, $first_row)) { // searches $key in first $row-array of source $array
+                    throw new $this->exceptionClass('The source array has no the \'next\' column \''.$src_next.'\'.');
+                }
+            }
+            
+            // leave loop
+            break;
+        }
         
-        // init required parameters
-        $this->tree = &$source;
-        $this->src_index = $src_index;
-        $this->src_parent = $src_parent;
-        $this->src_next = $src_next;
-        $this->top_ident = $top_ident;
-        $this->top_id = null;
-        
-        // allow directly output
-        $this->is_base = true;
-        $this->is_relation_child_sibling = true;
-        $this->is_relation_next = true;
-        
-        // chaining
-        return $this;
+        return true;
+    }
+    
+    /**
+     * 
+     */
+    public function getSrcParent()
+    {
+        return $this->src_parent;
+    }
+    
+    /**
+     * 
+     */
+    public function getTopIdent()
+    {
+        return $this->top_ident;
+    }
+    
+    /**
+     * 
+     */
+    public function getOptions()
+    {
+        return $this->options;
+    }
+    
+    /**
+     * 
+     */
+    private function getOptionsArray() : array
+    {
+        $opts = $this->options;
+               
+        return [
+            $opts->get(Option::COUNT_DESCENDANTS),
+            $opts->get(Option::NUMBERING),
+            $opts->get(Option::DEBUG_MODE),
+        ];
+    }
+    
+    /**
+     * 
+     */
+    public function getExceptionClass()
+    {
+        return $this->exceptionClass;
+    }
+    
+    /**
+     * 
+     */
+    public function setExceptionClass($exceptionClass)
+    {
+        $this->exceptionClass = $exceptionClass;
     }
     
     /**
@@ -433,100 +362,43 @@ class Tree
             
             // any top node isn't found: no sense to continue the tree building
             if (! isset($this->first_top_id)) {
-                throw new $this->ExceptionClass('Any top node isn\'t found (maybe a types mismatch).');
+                throw new $this->exceptionClass('Any top node isn\'t found (maybe a types mismatch).');
             }
         }
         
         return $this->first_top_id;
     }
-    
-    
-    
-    
+       
     /**
-     * Descendants counting
-     */
-    
-    /**
-     * Increments the children count for all ancestors of a passed node (node is
-     * determined with id).
      * 
-     * @param mixed     $id         An id of a node to increment the children count of its ancestors.
-     * @param mixed     $parent_id  A parent id of the passed node.
-     * @return void
      */
-    public function countDescendants(&$id, &$parent_id) : void
-    {        
-        // debug (to determine closure, if exists)
-        if ($this->fdebug_mode) $this->debug_dc_rbranch = "[$id]";
+    private function createNode(array &$tree, array &$src_node, &$src_index, &$is_descendants, &$is_numbering)
+    {
+        // the value of 'src_index' column of the source array became an index value of the new tree array
+        $i = $src_node[$src_index];             // note at now $i has the "string" type,
+        $tree[$i] = &$src_node;                 // but now $i, like an array index, has "int" type: PHP automatically converts string numbers to its integer values,
+                                                // that's why expression like '$this->tree[$prevtop_id]' or more explicitly '$this->tree["1"]' returns an array element, but not a PHP E_Notice.
+        // relations properties
+        $tree[$i]['firstChild'] = null;         // an id/index of a first child
+        $tree[$i]['lastChild'] = null;          // an id/index of a last child
+        $tree[$i]['nextSibl'] = null;           // an id/index of a next sibling
+        $tree[$i]['children'] = 0;              // children total
+        $tree[$i]['level'] = 0;                 // a node's level
+        $tree[$i]['next'] = null;               // an id/index of a next outputting node
+        $tree[$i]['loop'] = false;              // is used in createRelationChildSibling()
+        $tree[$i]['added'] = null;              // is used to determine a closure in the tree
+        $tree[$i]['upLoop'] = null;             // is used to determine a closure in the tree within 'parent' attribute while 'up loop' in 'relation_next' method
 
-        // a reversed branch (to null the 'loop' field)
-        $rbranch = [$id];
-
-        // mark node as used in loop (to detect closure, if exists)
-        $this->tree[$id]['loop'] = true;
-
-        $prev_dcparent_id = $id;
-        $dcparent_id = $parent_id;
-
-        // the descendant counting loop:
-        do {
-            // verify: did a node output?
-            if ($this->tree[$dcparent_id]['loop']) {
-                throw new $this->ExceptionClass(
-                    'Descendant counting (in '.__METHOD__.'): probably the current node (id: '.$prev_dcparent_id.') contains wrong a \'parent\', '.
-                    'because its parent (id: '.$dcparent_id.') again in loop - it is the closure.' .
-                    '(debug: reversed branch: ' . $this->debug_dc_rbranch . ').');
-            }
-            
-            // debug (to determine closure, if exists)
-            if ($this->fdebug_mode) {
-                $this->debug_dc_rbranch .= ".[$dcparent_id]";
-            }
-
-            // increase the descendants count of the parent node
-            $this->tree[$dcparent_id]['descendants']++;
-
-            // create a reversed branch (to null the 'loop' field of ancestors)
-            $rbranch[] = $dcparent_id;
-
-            // mark the node as used in loop (to determine closure, if exists)
-            $this->tree[$dcparent_id]['loop'] = true;
-
-            // save the current parent of the node as a prev parent (ancestor)
-            $prev_dcparent_id = $dcparent_id;
-
-            // get a next parent (ancestor) in the branch
-            $dcparent_id = $this->tree[$dcparent_id][$this->src_parent];
-
-            // check if a parent is a top node
-            if ($dcparent_id == $this->top_ident) {
-                // null the 'loop' field
-                $this->nullLoopAttribute($rbranch);
-
-                // go out from the descendant counting
-                break;
-            }
-        } while(1);
-    }
-    
-    /**
-     * Nulls the 'loop' field of a node.
-     
-     * @param   array $rev_branch An array is containing a branch from current node to its parents (reversed branch).
-     * @return  void
-     */
-    private function nullLoopAttribute(array &$rev_branch) : void
-    {   
-        // REVersed BRANCH
-        foreach ($rev_branch as $id) {
-            $this->tree[$id]['loop'] = false;
+        // additional properties
+        if ($is_descendants) {
+            $tree[$i]['descendants'] = 0;       // descendants total
+        }
+        if ($is_numbering) {
+            $tree[$i]['level'] = 0;             // the node level
+            $tree[$i]['childNumber'] = 0;       // an order in a children array. It will be the last number in 'numbering' property
+            $tree[$i]['numbering'] = null;      // a numbering expression: '1.1', '1.2.1'
         }
     }
-    
-    
-    
-    /** LOGIC METHODS  (implements a main logic of the class) */
     
     /**
      * 
@@ -540,42 +412,17 @@ class Tree
         
         // a new tree array
         $tree = [];
+        $src_index = $this->src_index;
         
         // options
-        $opts = $this->options;
-        $is_descendants = $opts->get(Option::COUNT_DESCENDANTS);
-        $is_numbering = $opts->get(Option::NUMBERING);
-        
+        list($is_descendants, $is_numbering, ) = $this->getOptionsArray();
+                
         // write all rows (nodes) of the source array to a new tree array
         foreach ($this->source as &$src_node) {
-            // the value of 'src_index' column of the source array became an index value of the new tree array
-            $i = $src_node[$this->src_index];     // note at now $i has the "string" type,
-            $tree[$i] = &$src_node;               // but now $i, like an array index, has "int" type: PHP automatically converts string numbers to its integer values,
-            // that's why expression like '$this->tree[$prevtop_id]' or more explicitly '$this->tree["1"]' returns an array element, but not a PHP Notice.
-            // relations properties
-            $tree[$i]['firstChild'] = null;         // an id/index of a first child
-            $tree[$i]['lastChild'] = null;          // an id/index of a last child
-            $tree[$i]['nextSibl'] = null;           // an id/index of a next sibling
-            $tree[$i]['children'] = 0;              // children total
-            $tree[$i]['level'] = 0;                 // a node's level
-            $tree[$i]['next'] = null;               // an id/index of a next outputting node
-            $tree[$i]['loop'] = false;              // is used in createRelationChildSibling()
-            $tree[$i]['added'] = null;              // is used to determine a closure in the tree
-            $tree[$i]['upLoop'] = null;             // is used to determine a closure in the tree within 'parent' attribute while 'up loop' in 'relation_next' method
-            
-            // additional properties
-            if ($is_descendants) {
-                $tree[$i]['descendants'] = 0;       // descendants total
-            }
-            if ($is_numbering) {
-                $tree[$i]['level'] = 0;             // a node's level
-                $tree[$i]['childNumber'] = 0;       // an order in a children array. It will last number in 'numbering' property
-                $tree[$i]['numbering'] = null;      // a numbering expression: '1.1', '1.2.1'
-            }
+            $this->createNode($tree, $src_node, $src_index, $is_descendants, $is_numbering);
         }
         
-        
-        // save the new tree
+        // save new tree
         $this->tree = &$tree;
         
         // mark the tree as prepared for a relations building
@@ -602,14 +449,15 @@ class Tree
         // verify: has a tree a base to build relations?
         if (! $this->is_base) {
             $this->createBase();
-            //throw new $this->ExceptionClass('The tree has no a base for building any relations, call $this->base() before.');
         }
         
         
         // options
-        $opts = $this->options;
-        $is_descendants = $opts->get(Option::COUNT_DESCENDANTS);
-        $is_numbering = $opts->get(Option::NUMBERING);
+        list($is_descendants, $is_numbering, $is_debug_mode) = $this->getOptionsArray();
+        // descendants counting
+        if ($is_descendants) {
+            $descendant = new Descendant($this, $this->tree, $is_debug_mode);
+        }
         
         
         // previous top node id
@@ -655,13 +503,7 @@ class Tree
             
             // verify: has node a parent?
             if (! isset($this->tree[$parent_id])) {
-                $message = 'Node (id: ' . $id . ') has no parent (id: ' . $parent_id . ').';
-                
-                if (! empty($this->ExceptionClass)) {
-                    throw new $this->ExceptionClass($message);
-                } else {
-                    throw Exception\NoParentException($message);
-                }
+                throw new $this->exceptionClass( 'Node (id: ' . $id . ') has no parent (id: ' . $parent_id . ').' );
             }
             
             // is the current node a first child?
@@ -701,7 +543,7 @@ class Tree
             
             // descendant counting
             if ($is_descendants) {
-                $this->countDescendants($id, $parent_id);
+                $descendant->count($id, $parent_id);
             }
         }
         
@@ -743,12 +585,9 @@ class Tree
         
         
         // options
-        $opts = $this->options;
-        $is_childrens = $opts->get(Option::COUNT_CHILDREN);
-        $is_descendants = $opts->get(Option::COUNT_DESCENDANTS);
-        $is_numbering = $opts->get(Option::NUMBERING);
+        list($is_descendants, $is_numbering, ) = $this->getOptionsArray();
         if ($is_numbering) {
-            $nb = $opts->numbering;
+            $nb = $this->options->numbering;
         }
         
         // current node level
@@ -780,91 +619,19 @@ class Tree
         // Tree Building
         do {
             // Seek a next node:
+            if (! $this->getNextNode($id, $level)) {
+                break;
+            } else {
+                $node = &$this->tree[$id];
+            }
             
-            // if a node is child
-            if (isset($node['firstChild'])) {
-            //if (isset($this->tree[$id]['firstChild'])) {
-                //$id = $this->tree[$id]['firstChild'];
-                $id = $node['firstChild'];
-                $node = &$this->tree[$id];
-                $level++;
-            } // if a node is sibling
-            elseif (isset($node['nextSibl'])) {
-            //elseif (isset($this->tree[$id]['nextSibl'])) {
-                //$id = $this->tree[$id]['nextSibl'];
-                $id = $node['nextSibl'];
-                $node = &$this->tree[$id];
-                //$level++; // Level does not change
-            }
-            else { // the cureent node has no any child or sibling
-                // the node is a single top or a last top - has no any children or siblings
-                if ($node[$this->src_parent] === $this->top_ident) {
-                //if ($this->tree[$id][$this->src_parent] === $this->top_ident) {
-                    break;
-                }
-                
-                // go up to check its parent or ancestors
-                $node['upLoop'] = true; // protection: to determine a closure with the 'parent' attribute and to stop the process
-                //$this->tree[$id]['upLoop'] = true; // protection: to determine a closure with the 'parent' attribute and to stop the process
-                $up_id = $node[$this->src_parent];
-                //$up_id = $this->tree[$id][$this->src_parent];
-                $up_node = &$this->tree[$up_id];
-                $level--;
-                do {
-                    // protection: to determine a closure with the 'parent' attribute and to stop the process
-                    if ($up_node['upLoop']) {
-                    //if ($this->tree[$up_id]['upLoop']) {
-                        $message = 'FATAL ERROR: a closure in the tree, the node (id: ' . $id . ') was used within the \'Up-loop\' and is using again.';
-                
-                        if (! empty($this->ExceptionClass)) {
-                            throw new $this->ExceptionClass($message);
-                        } else {
-                            throw Exception\UpLoopClosureException($message);
-                        }
-                        
-                    } else {
-                        $up_node['upLoop'] = true;
-                        //$this->tree[$up_id]['upLoop'] = true;
-                    }
-                    
-                    // seek sibling
-                    if (isset($up_node['nextSibl'])) {
-                    //if (isset($this->tree[$up_id]['nextSibl'])) {
-                        // found sibling! 
-                        $id = $up_node['nextSibl'];
-                        $node = &$this->tree[$id];
-                        //$id = $this->tree[$up_id]['nextSibl']; 
-                        break; // 'breake' is necessary
-                    } else {
-                        if ($up_node[$this->src_parent] === $this->top_ident) {
-                        //if ($this->tree[$up_id][$this->src_parent] === $this->top_ident) {
-                            // it is a top node and it has no a sibling
-                            break 2; // the tree is built!
-                        } else {
-                            // the node has no a sibling and is not a top node, therefore get its parent and continue search
-                            $up_id = $up_node[$this->src_parent];
-                            $up_node = &$this->tree[$up_id];
-                            //$up_id = $this->tree[$up_id][$this->src_parent];
-                            $level--;
-                        }
-                    }
-                } while(1);
-            }
-
             
             // Node properties / operations (it's new found next node)
             
             // protection: determine closure (and stop process if found)
             if ($node['added']) {
-            //if ($this->tree[$id]['added']) {
-                $message = 'FATAL ERROR: a closure in the tree, the node (id: ' . $id . ') was added to the tree and is adding again.';
-                
-                if (! empty($this->ExceptionClass)) {
-                    throw new $this->ExceptionClass($message);
-                } else {
-                    throw Exception\AddedClosureException($message);
-                }
-                
+                $message = 'Closure in the tree, the node (id: ' . $id . ') was added to the tree and is adding again.';
+                throw new $this->exceptionClass($message);
             }
             
             // mark the node as added
@@ -883,8 +650,7 @@ class Tree
                 // the full numbering symbol of the parent node (something like: '1', '1.1.3', 'A.1', 'A.B', etc.)
                 $parent_id = $node[$this->src_parent];
                 $parentNumbering = $this->tree[$parent_id]['numbering'];
-                $numbering = $nb->getNumbering($node['level'], $node['childNumber'], $parentNumbering);
-                $node['numbering'] = $numbering;
+                $node['numbering'] = $nb->getNumbering($node['level'], $node['childNumber'], $parentNumbering);
             }
             
             
@@ -905,10 +671,85 @@ class Tree
         // chaining
         return $this;
     }
-        
-
     
-    /** RESULTING METHODS  (allows to get a result: a sorted array with the tree or the outputted tree) */
+    /**
+     * 
+     */
+    private function getNextNode(&$id, &$level) : bool
+    {
+        $node = &$this->tree[$id];
+        if (isset($node['firstChild'])) {
+            $id = $node['firstChild'];
+            $level++;
+        } // if a node is sibling
+        elseif (isset($node['nextSibl'])) {
+            $id = $node['nextSibl'];
+            //$level++; // Level does not changes
+        }
+        else { // the cureent node has no any child or sibling
+            // the node is a single top or a last top - has no any children or siblings
+            if ($node[$this->src_parent] === $this->top_ident) {
+                return false;
+            }
+
+            // go up to check its parent or ancestors
+            $node['upLoop'] = true; // protection: to determine a closure with the 'parent' attribute and to stop the process
+            
+            $up_id = $node[$this->src_parent];
+            $up_node = &$this->tree[$up_id];
+            
+            $level--;
+            
+            do {
+                // protection: to determine a closure with the 'parent' attribute and to stop the process
+                if ($up_node['upLoop']) {
+                    $msg = 'Closure in the tree, the node (id: ' . $id . ') was used within the \'Up-loop\' and is using again.';
+                    throw new $this->exceptionClass($msg);
+                } else {
+                    $up_node['upLoop'] = true;
+                }
+
+                // seek sibling
+                if (isset($up_node['nextSibl'])) {
+                    // found sibling! 
+                    $id = $up_node['nextSibl']; 
+                    break; // 'breake' is necessary
+                } else {
+                    if ($up_node[$this->src_parent] === $this->top_ident) {
+                        // it is a top node and it has no a sibling
+                        return false; // the tree is built!
+                    } else {
+                        // the node has no a sibling and is not a top node, therefore get its parent and continue search
+                        $up_id = $up_node[$this->src_parent];
+                        $up_node = &$this->tree[$up_id];
+                        $level--;
+                    }
+                }
+            } while(1);
+        }
+               
+        return true;
+    }
+    
+    /**
+     * Returns the current raw tree.
+     * 
+     * @return null|array
+     */
+    public function get()
+    {
+        return $this->tree;
+    }
+    
+    /**
+     * Returns the current raw tree.
+     * 
+     * @return null|array
+     */
+    public function getCurrent()
+    {
+        return $this->get();
+    }
     
     /**
      * Creates and returns a new sorted array (based on relation 'next' of the tree array).
@@ -926,27 +767,31 @@ class Tree
      * 
      * @return array A new tree sorted array.
      */
-    public function getAsArray() : array 
+    public function getSorted() : array 
     {
         // is exists the sorted tree?
-        if (!empty($this->sorted)) {
+        if (! empty($this->sorted)) {
             return $this->sorted;
         }
         
-        // determine a kind of method to be run
-        $this->isExtended();
+        // create tree base (additional fields)
+        if (! $this->is_base) {
+            $this->createBase();
+        }
         
-        // create a new array which is based on the source array
-        $this->base();
+        // create relation 'child & sibling'
+        if (! $this->is_relation_child_sibling) {
+            $this->createRelationChildSibling();
+        }
         
-        // set relations 'child' and 'sibling'
-        $this->createRelationChildSibling();
-        
-        // set relation 'next'
-        $this->createRelationNext(); // zt now the tree is built and can be outputted
+        // create relation 'next'
+        if (! $this->is_relation_next) {
+            $this->createRelationNext(); // at now the tree is built and can be outputted       
+        }
         
         // make a new sorded array from a relational tree array
         $id = $this->getFirstTopId();
+        
         do {
             $sorded_tree[] = &$this->tree[$id];
             $id = &$this->tree[$id]['next'];
@@ -959,6 +804,31 @@ class Tree
         $this->sorted = &$sorded_tree;
         
         return $sorded_tree;
+    }
+    
+    /**
+     * 
+     */
+    public function setAsBuild(array &$source, $src_index, $src_parent, $src_next, $top_ident = '0')
+    {
+        // verify the source array
+        $this->verifySource($source, $src_index, $src_parent, $src_next);
+        
+        // init required parameters
+        $this->tree = &$source;
+        $this->src_index = $src_index;
+        $this->src_parent = $src_parent;
+        $this->src_next = $src_next;
+        $this->top_ident = $top_ident;
+        $this->top_id = null;
+        
+        // allow directly output
+        $this->is_base = true;
+        $this->is_relation_child_sibling = true;
+        $this->is_relation_next = true;
+        
+        // chaining
+        return $this;
     }
     
     /**
@@ -1008,7 +878,7 @@ class Tree
         // view
         $view = $this->options->view;
         // add new levels and fills them with default values
-        $view->addNewLevels($this->levels);
+        $view->addLevels($this->levels);
         
         
         // OUTPUT
@@ -1048,25 +918,20 @@ class Tree
                 $lc = abs($lc);
                 for ($i = 1; $i <= $lc; $i++) {
                     // output a close tag of a block
-                    //echo $this->view[$prev_level - $i]['block']['end'];
                     echo $view->getBlockEnd($prev_level - $i, $this->tree[$id]); // here node_arr is ambiguous
                     
                     // output a close tag of a item
-                    //echo $this->view[$prev_level - $i]['item']['end'];
                     echo $view->getItemEnd($prev_level - $i, $this->tree[$id]);
                 }
             }
             // output a open tag of a item
-            //echo $this->getNodeString($this->tree[$id], $this->view[$level]['item']['start']);
             echo $view->getItemStart($level, $this->tree[$id]);
 
             // output a tag of a content
-            //echo $this->getNodeString($this->tree[$id], $this->view[$level]['content']);
             echo $view->getContent($level, $this->tree[$id]);
 
             // [output a close tag of a item: if a item has no children]
             if ($this->tree[$id]['children'] == 0) {
-                //echo $this->view[$level]['item']['end'];
                 echo $view->getItemEnd($level, $this->tree[$id]);
             }
 
@@ -1081,56 +946,7 @@ class Tree
         // output a close tag of a wrapper
         echo $view->getWrapperEnd($this->tree[$first_id]);
     }
-    
-    private function getNextNode(&$id, &$level) : bool
-    {
-        if (isset($this->tree[$id]['firstChild'])) {
-            $id = $this->tree[$id]['firstChild'];
-            $level++;
-        } // if a node is sibling
-        elseif (isset($this->tree[$id]['nextSibl'])) {
-            $id = $this->tree[$id]['nextSibl'];
-            //$level++; // Level does not changes
-        }
-        else { // the cureent node has no any child or sibling
-            // the node is a single top or a last top - has no any children or siblings
-            if ($this->tree[$id][$this->src_parent] === $this->top_ident) {
-                return false;
-            }
-
-            // go up to check its parent or ancestors
-            $this->tree[$id]['upLoop'] = true; // protection: to determine a closure with the 'parent' attribute and to stop the process
-            $up_id = $this->tree[$id][$this->src_parent];
-            $level--;
-            do {
-                // protection: to determine a closure with the 'parent' attribute and to stop the process
-                if ($this->tree[$up_id]['upLoop']) {
-                    throw new $this->ExceptionClass('FATAL ERROR: a closure in the tree, the node (id: ' . $id . ') was used within the \'Up-loop\' and is using again.');
-                } else {
-                    $this->tree[$up_id]['upLoop'] = true;
-                }
-
-                // seek sibling
-                if (isset($this->tree[$up_id]['nextSibl'])) {
-                    // found sibling! 
-                    $id = $this->tree[$up_id]['nextSibl']; 
-                    break; // 'breake' is necessary
-                } else {
-                    if ($this->tree[$up_id][$this->src_parent] === $this->top_ident) {
-                        // it is a top node and it has no a sibling
-                        return false; // the tree is built!
-                    } else {
-                        // the node has no a sibling and is not a top node, therefore get its parent and continue search
-                        $up_id = $this->tree[$up_id][$this->src_parent];
-                        $level--;
-                    }
-                }
-            } while(1);
-        }
-               
-        return true;
-    }
-    
+        
     /**
      * Builds a tree and parallely outputs it.
      * 
@@ -1146,7 +962,7 @@ class Tree
      * @param array $cview  An array with custom user settings of a view.
      * @return void
      */
-    public function fastOutput()
+    public function outputFast()
     {
         // create tree base (additional fields)
         if (! $this->is_base) {
@@ -1157,7 +973,13 @@ class Tree
         if (! $this->is_relation_child_sibling) {
             $this->createRelationChildSibling();
         }
-
+        
+        
+        // options
+        list($is_descendants, $is_numbering, ) = $this->getOptionsArray();
+        if ($is_numbering) {
+            $nb = $this->options->numbering;
+        }
 
 
         // level values
@@ -1176,7 +998,11 @@ class Tree
         // first node
         $first_node['level'] = $level;
         $first_node['added'] = true; // mark a node as added to a tree, to help determine a closure
-
+        if ($is_numbering) {
+            $numbering = $nb->getNumbering($first_node['level'], $first_node['childNumber']);
+            $first_node['numbering'] = $numbering;
+        }
+        
         // view
         $view = $this->options->view;
         
@@ -1185,7 +1011,7 @@ class Tree
         
         
         // Output
-        //pm_start('Output in '.__METHOD__.'+getNextNode(): 100k');
+    
         // output a open tag of a wrapper
         echo $view->getWrapperStart($first_node);
         
@@ -1194,18 +1020,13 @@ class Tree
         
         // first node
         // output a open tag of a block
-        //echo $this->$getNodeString($this->tree[$id], $this->view[$out_level]['block']['start']);
         echo $view->getBlockStart($out_level, $first_node);
         // output a open tag of a item
-        //echo $this->$getNodeString($this->tree[$id], $this->view[$out_level]['item']['start']);
         echo $view->getItemStart($out_level, $first_node);
         // output a tag of a content
-        //echo $this->$getNodeString($this->tree[$id], $this->view[$out_level]['content']);
         echo $view->getContent($out_level, $first_node);
         // [output a close tag of a item: if a node has no children]
-        //if ($this->tree[$id]['children'] == 0) {
         if ($node['children'] == 0) {
-            //echo $this->view[$out_level]['item']['end'];
             echo $view->getItemEnd($out_level, $first_node); // $node is 
         }
         
@@ -1221,7 +1042,7 @@ class Tree
             
             // if a closure, stop the process
             if ($node['added']) {
-                throw new $this->ExceptionClass('FATAL ERROR: a closure in the tree, a node (id: ' . $id . ') was added to the tree and is adding again.');
+                throw new $this->exceptionClass('Closure in the tree, a node (id: ' . $id . ') was added to the tree and is adding again.');
             }
             
             // save a level of a node
@@ -1240,6 +1061,13 @@ class Tree
             
             // mark a node as added
             $node['added'] = true;
+            // numbering
+            if ($is_numbering) {
+                // the full numbering symbol of the parent node (something like: '1', '1.1.3', 'A.1', 'A.B', etc.)
+                $parent_id = $node[$this->src_parent];
+                $parentNumbering = $this->tree[$parent_id]['numbering'];
+                $node['numbering'] = $nb->getNumbering($node['level'], $node['childNumber'], $parentNumbering);
+            }
 
             // OUTPUT
             if ($level > $prev_level) {
@@ -1247,33 +1075,27 @@ class Tree
                 $view->addLevel($level);
                 
                 // output a open tag of a block
-                //echo $this->$getNodeString($this->tree[$id], $this->view[$level]['block']['start']);
                 echo $view->getBlockStart($level, $node);
             } elseif (($lc = $level - $prev_level) < 0) {
                 // the current node level is less, than a previous node level: put one or few end tags for a view block and a view item
                 $lc = abs($lc);
                 for ($i = 1; $i <= $lc; $i++) {
                     // output a close tag of a block
-                    //echo $this->view[$prev_level - $i]['block']['end'];
                     echo $view->getBlockEnd($prev_level - $i, $node); // 
                     
-                    // output a close tag of a item
-                    //echo $this->view[$prev_level - $i]['item']['end'];
+                    // output a close tag of a item                    
                     echo $view->getItemEnd($prev_level - $i, $node); // 
                 }
             }
             
             // output a open tag of a item
-            //echo $this->$getNodeString($this->tree[$id], $this->view[$level]['item']['start']);
             echo $view->getItemStart($level, $node); // 
 
             // output a tag of a content
-            //echo $this->$getNodeString($this->tree[$id], $this->view[$level]['content']);
             echo $view->getContent($level, $node); // 
 
             // [output a close tag of a item: if a item has no children]
             if ($node['children'] == 0) {
-                //echo $this->view[$level]['item']['end'];
                 echo $view->getItemEnd($level, $node); // 
             }
 

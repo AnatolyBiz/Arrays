@@ -1,8 +1,7 @@
 <?php
-/**
- * 
- */
 namespace Arrays\D2\Tree\View;
+
+use Arrays\D2\Tree\AdjacencyList\Tree;
 
 /**
  * Used for .
@@ -20,36 +19,7 @@ class View
      * @var array
      */
     private $view;
-    
-    /**
-     * 
-     */
-    private $levels = 0;
-    
-    /**
-     * Contains default expression of 'level block' part.
-     * 
-     * Is extracted to single variable, because a default value of $view is 
-     * overriding with apply_custom_view method, but later is required in 
-     * build_output method.
-     * 
-     * @access private
-     * @var string
-     */
-    private $default_block;
-    
-    /**
-     * Contains default expression of 'level item' part.
-     * 
-     * Is extracted to single variable, because a default value of $view is 
-     * overriding with apply_custom_view method, but later is required in 
-     * build_output method.
-     * 
-     * @access private
-     * @var string
-     */
-    private $default_item;
-    
+        
     /**
      * Contains pattern part to replace column expression with computed value.
      * Initializes in __constructor method with add/getReplacingPattern methods.
@@ -104,10 +74,21 @@ class View
      */
     private $inserter = [];
     
+    /**
+     * An exception class name, which is used while error arise.
+     * 
+     * @access private
+     * @var string
+     */
+    private $exceptionClass;
     
     
-    public function __construct($src_index, $src_parent)
+    
+    public function __construct(Tree $tree)
     {
+        // exceptions
+        $this->exceptionClass = $tree->getExceptionClass();
+        
         // get config
         $cnf = require __DIR__ . '/../../../Config/d2.tree.view.config.php';
         
@@ -118,17 +99,9 @@ class View
         $view = &$cnf['view'];
                 
         // apply settings
-        $this->add($view);
-        
+        $this->set($view);
     }
     
-    /**
-     * 
-     */
-    public function setLevels($levels)
-    {
-        $this->levels = $levels;
-    }
     
     /**
      * Returns the array with view settings
@@ -145,90 +118,80 @@ class View
      */
     public function set(array &$view)
     {
+        // Set raw (user comfortable) view
         $this->view = &$view;
+        // Prepare view
+        $this->prepare($view);
     }
         
     /**
-     * Applies a custom view settings and default setting.
+     * Adds a custom view settings.
      * 
-     * @param   array   $cview  An array with a custom view settings.
+     * @param   array   $view  An array with a custom view settings.
      * @return  void
      */
-    public function add(array &$cview) : void
+    public function add(array &$view) : void
+    {
+        // Add settings for defaults.
+        $this->addDefaultsSettings($view);
+
+        // Add settings for custom levels
+        $this->addLevelsSettings($view);
+        
+        // Replaces all ~ '<nav>{{}}</nav>' to array ['start'=>'nav', 'end'=>'</nav>']
+        $this->prepare($this->view);
+    }
+    private function addDefaultsSettings(array &$view)
     {
         // splitter
-        if (isset($cview['splitter'])){
-            if (isset($cview['splitter']['start'])){
-                $this->view['splitter']['start'] = $cview['splitter']['start'];
-            }
-            if (isset($cview['splitter']['end'])) {
-                $this->view['splitter']['end'] = $cview['splitter']['end'];
-            }
+        if (isset($view['splitter']['start'])) {
+            $this->view['splitter']['start'] = $view['splitter']['start'];
         }
-        // for more explicit syntax, save separators in short named variables
-        $splitter_start = $this->view['splitter']['start'];
-        $splitter_end = $this->view['splitter']['end'];
-        // create pattern for replace a column expression with a column value
-        $this->replacing_pattern = $this->getReplacingPattern($splitter_start, $splitter_end);
-
+        if (isset($view['splitter']['end'])) {
+            $this->view['splitter']['end'] = $view['splitter']['end'];
+        }
+        
         // wrapper
-        $default_wrapper = $this->view['wrapper'];
-        $this->view['wrapper'] = [];
-        if (isset($cview['wrapper']) && is_string($cview['wrapper'])) {
-            list($this->view['wrapper']['start'], $this->view['wrapper']['end']) = 
-                explode($splitter_start.$splitter_end, $cview['wrapper']);
-        } else {
-            list($this->view['wrapper']['start'], $this->view['wrapper']['end']) = 
-                explode($splitter_start.$splitter_end, $default_wrapper);
+        if (isset($view['wrapper']) && is_string($view['wrapper'])) {
+            $this->view['wrapper'] = $view['wrapper'];
         }
 
         // default level
+        // 
         // block
-        $this->view['level']['block'] = [];
-        if (isset($cview['level'])  &&  isset($cview['level']['block']) && is_string($cview['level']['block'])) {
-            $this->default_block = $cview['level']['block'];
-            list($this->view['level']['block']['start'], $this->view['level']['block']['end']) = 
-                explode($splitter_start.$splitter_end, $cview['level']['block']);
-        } else {
-            list($this->view['level']['block']['start'], $this->view['level']['block']['end']) = 
-                explode($splitter_start.$splitter_end, $this->default_block);
+        if (isset($view['level']['block']) && is_string($view['level']['block'])) { // it generate E_NOTICE exceptions, but so is more speedly
+            $this->view['level']['block'] = $view['level']['block'];
         }
         // item
-        $this->view['level']['item'] = [];
-        if (isset($cview['level']) &&  isset($cview['level']['item']) && is_string($cview['level']['item'])) {
-            $this->default_item = $cview['level']['item'];
-            list($this->view['level']['item']['start'], $this->view['level']['item']['end']) = 
-                explode($splitter_start.$splitter_end, $cview['level']['item']);
-        } else {
-            list($this->view['level']['item']['start'], $this->view['level']['item']['end']) = 
-                explode($splitter_start.$splitter_end, $this->default_item);
+        if (isset($view['level']['item']) && is_string($view['level']['item'])) {
+            $this->view['level']['item'] = $view['level']['item'];
         }
         // content
-        if (isset($cview['level']) &&  isset($cview['level']['content']) && is_string($cview['level']['content'])) {
-            $this->view['level']['content'] = $cview['level']['content'];
+        if (isset($view['level']['content']) && is_string($view['level']['content'])) {
+            $this->view['level']['content'] = $view['level']['content'];
         }
-
+    }
+    private function addLevelsSettings(array &$view)
+    {
         // levels (only user settings)
         $aside = 0;
-        if (isset($cview['splitter'])) {
+        if (isset($view['splitter'])) {
             $aside++;
         }
-        if (isset($cview['wrapper'])) {
+        if (isset($view['wrapper'])) {
             $aside++;
         }
-        if (isset($cview['level'])) {
+        if (isset($view['level'])) {
             $aside++;
         }
-        if ((count($cview) - $aside) > 0) {     // if TRUE, is present sets for levels (exclude defaults)
-            foreach($cview as $i => &$level) {  // all custom levels
+        if ((count($view) - $aside) > 0) {     // if TRUE, is present sets for levels (exclude defaults)
+            foreach($view as $i => &$level) {  // all custom levels
                 if (is_int($i)) {               // omit wrapper and level settings (which has string keys)
                     if (isset($level['block']) && is_string($level['block'])) {
-                        list($this->view[$i]['block']['start'], $this->view[$i]['block']['end']) = 
-                            explode($splitter_start.$splitter_end, $level['block']);
+                        $this->view[$i]['block'] = $level['block'];
                     }
                     if (isset($level['item']) && is_string($level['item'])) {
-                        list($this->view[$i]['item']['start'], $this->view[$i]['item']['end']) = 
-                            explode($splitter_start.$splitter_end, $level['item']);
+                        $this->view[$i]['item'] = $level['item'];
                     }
                     if (isset($level['content']) && is_string($level['content'])) {
                         $this->view[$i]['content'] = $level['content'];
@@ -236,32 +199,169 @@ class View
                 }
             }
         }
-
-        // fill the view object with default values for all other levels. Is sence only if 'is_relation_next', when levels count is known
-        $this->addLevels($this->levels);
     }
     
-    public function addLevels($levels)
+    /**
+     * Replaces string template parts with arrays (every array contains 'start'
+     * and 'end' attr).
+     */
+    private function prepare(array &$view)
+    {
+        $this->prepareDefaults($view);
+        $this->prepareLevels($view);
+    }
+    private function prepareDefaults(array &$view)
     {
         // for more explicit syntax, save separators in short named variables
-        $splitter_start = $this->view['splitter']['start'];
-        $splitter_end = $this->view['splitter']['end'];
+        list($sp_start, $sp_end, $sp_whole) = $this->getSplitters($view);
         
-        // fill the view object with default values for all other levels. Is sence only if 'is_relation_next', when levels count is known
+        // Remake pattern
+        $this->preparePattern($sp_start, $sp_end);
+        
+        // Wrapper, if not prepared
+        if (is_string($view['wrapper'])) {
+            $this->prepareWrapper($view, $sp_whole);
+        }
+        
+        // Level Block, if not prepared
+        if (is_string($view['level']['block'])) {
+            $this->prepareBlock($view, 'level', $sp_whole);
+        }
+        // Level Item, if not prepared
+        if (is_string($view['level']['item'])) {
+            $this->prepareItem($view, 'level', $sp_whole);
+        }
+    }
+    private function prepareLevels(array &$view)
+    {
+        // for more explicit syntax, save separators in short named variables
+        list(, , $sp_whole) = $this->getSplitters($view);
+        
+        // levels (only user settings)
+        $aside = 0;
+        if (isset($view['splitter'])) {
+            $aside++;
+        }
+        if (isset($view['wrapper'])) {
+            $aside++;
+        }
+        if (isset($view['level'])) {
+            $aside++;
+        }
+        if ((count($view) - $aside) > 0) {     // if TRUE, is present sets for levels (exclude defaults)
+            foreach($view as $i => &$level) {  // all custom levels
+                if (is_int($i)) {               // omit wrapper and level settings (which has string keys)
+                    if (isset($level['block']) && is_string($level['block'])) {
+                        $this->prepareBlock($view, $i, $sp_whole);
+                    }
+                    if (isset($level['item']) && is_string($level['item'])) {
+                        $this->prepareItem($view, $i, $sp_whole);
+                    }
+                }
+            }
+        }
+    }
+    private function getSplitters(array &$view) : array
+    {
+        $sp_start = &$view['splitter']['start'];
+        $sp_end = &$view['splitter']['end'];
+        $sp_whole = $sp_start . $sp_end;
+        
+        return [$sp_start, $sp_end, $sp_start . $sp_end];
+    }
+    private function preparePattern(string &$sp_start, string &$sp_end)
+    {
+        // create pattern for replace a column expression with a column value
+        $this->replacing_pattern = $this->getReplacingPattern($sp_start, $sp_end);
+    }
+    private function prepareWrapper(array &$view, string &$sp_whole)
+    {
+        $wrapper_str = $view['wrapper'];
+        $view['wrapper'] = [];
+        list(
+            $view['wrapper']['start'],
+            $view['wrapper']['end']
+        ) = explode($sp_whole, $wrapper_str);
+    }
+    private function prepareBlock(array &$view, $level, string &$sp_whole)
+    {
+        // save defaults
+        $this->default_block = $view[$level]['block'];
+        
+        $block_str = $view[$level]['block'];
+        $view[$level]['block'] = [];
+        list(
+            $view[$level]['block']['start'],
+            $view[$level]['block']['end']
+        ) = explode($sp_whole, $block_str);
+    }
+    private function prepareItem(array &$view, $level, string &$sp_whole)
+    {
+        // save defaults
+        $this->default_item = $view[$level]['item'];
+        
+        $item_str = $view[$level]['item'];
+        $view[$level]['item'] = [];
+        list(
+            $view[$level]['item']['start'],
+            $view[$level]['item']['end']
+        ) = explode($sp_whole, $item_str);
+    }
+    
+    /**
+     * Applies a default settings for a passed level. In fact, creates new level
+     * in $this->view array with default setting.
+     * 
+     * For what?: to use level view settings, while node is outputting, these view
+     * settings must be exist.
+     * 
+     * Used only in outputFast() method, which is used to speed up a 
+     * building and outputting process.
+     * 
+     * @param   int     $level      The number of a tree level. Range: [0; infinity].
+     * @return
+     */
+    public function addLevel($level)
+    {
+        $view = &$this->view;
+        
+        // block
+        if (! isset($view[$level]['block'])) {
+            $view[$level]['block']['start'] = &$view['level']['block']['start'];
+            $view[$level]['block']['end'] = &$view['level']['block']['end'];
+        }
+        // item
+        if (! isset($view[$level]['item'])) {
+            $view[$level]['item']['start'] = &$view['level']['item']['start'];
+            $view[$level]['item']['end'] = &$view['level']['item']['end'];
+        }
+        // content
+        if (! isset($view[$level]['content'])) {
+            $view[$level]['content'] = &$view['level']['content'];
+        }
+    }
+    
+    /**
+     * Fill the view object with new levels and give to level default values. Is has
+     * sence only if 'is_relation_next', when levels count is known.
+     */
+    public function addLevels(int $levels)
+    {
+        $view = &$this->view;
         for ($i = 0; $i <= $levels; $i++) {
             // block
-            if (! isset($this->view[$i]['block'])) {
-                list($this->view[$i]['block']['start'], $this->view[$i]['block']['end']) = 
-                    explode($splitter_start.$splitter_end, $this->default_block);
+            if (! isset($view[$i]['block'])) {
+                $view[$i]['block']['start'] = &$view['level']['block']['start'];
+                $view[$i]['block']['end'] = &$view['level']['block']['end'];
             }
             // item
-            if (! isset($this->view[$i]['item'])) {
-                list($this->view[$i]['item']['start'], $this->view[$i]['item']['end']) = 
-                    explode($splitter_start.$splitter_end, $this->default_item);
+            if (! isset($view[$i]['item'])) {
+                $view[$i]['item']['start'] = &$view['level']['item']['start'];
+                $view[$i]['item']['end'] = &$view['level']['item']['end'];
             }
             // content
-            if (! isset($this->view[$i]['content'])) {
-                $this->view[$i]['content'] = $this->view['level']['content'];
+            if (! isset($view[$i]['content'])) {
+                $view[$i]['content'] = &$view['level']['content'];
             }
         }
     }
@@ -274,41 +374,6 @@ class View
         $this->output_handler = $name;
     }
     
-    /**
-     * Applies a default settings for a passed level. In fact, creates new level
-     * in $this->view array with default setting.
-     * 
-     * Principal: to use level view settings, while node is outputting, this view
-     * settings must be exist.
-     * 
-     * Used only in quicklyOutput() method, which is used to speed up a 
-     * building and outputting process.
-     * 
-     * @param   int     $level      The number of a tree level. Range: [0; infinity].
-     * @return
-     */
-    public function addLevel($level)
-    {
-        // for more explicit syntax save separators in short named variables
-        $splitter_start = $this->view['splitter']['start'];
-        $splitter_end = $this->view['splitter']['end'];
-        
-        
-        // block
-        if (! isset($this->view[$level]['block'])) {
-            list($this->view[$level]['block']['start'], $this->view[$level]['block']['end']) = 
-                explode($splitter_start.$splitter_end, $this->default_block);
-        }
-        // item
-        if (! isset($this->view[$level]['item'])) {
-            list($this->view[$level]['item']['start'], $this->view[$level]['item']['end']) = 
-                explode($splitter_start.$splitter_end, $this->default_item);
-        }
-        // content
-        if (! isset($this->view[$level]['content'])) {
-            $this->view[$level]['content'] = $this->view['level']['content'];
-        }
-    }
     
     /**
      * Adds a new replacer (a callable).
@@ -320,7 +385,7 @@ class View
      * @param callable  $replacer   A anonymous function (with signature identical to described above).
      * @return void
      */
-    public function addReplacer(string $key, OutputReplacer $or_obj) : void
+    public function addOutputReplacer(string $key, Replacer $or_obj) : void
     {
         // verifying signature of $replacer
         $replacer = $or_obj->replacer;
@@ -332,22 +397,22 @@ class View
             $total_params = 2; // $id, $result
             $num_of_rparams = $refl->getNumberOfRequiredParameters();
             if ($num_of_rparams != $total_params) {
-                throw new $this->ExceptionClass('The replacer method has wrong signature: is passed '.$num_of_rparams.' required parameters, but need - 2.');
+                throw new $this->exceptionClass('The replacer method has wrong signature: is passed '.$num_of_rparams.' required parameters, but need - 2.');
             }
             
             // parameters types
             $error_message = 'A parameter of the replacer method is wrong (it has not an allowed name or is passed not by reference)).';
             $params = $refl->getParameters();
             $pi = -1;
-            // $id parameter
+            // $node_arr parameter
             $prm = $params[++$pi];
-            if (!($prm->getName() === 'node' && $prm->isPassedByReference())) {
-                throw new $this->ExceptionClass($error_message);
+            if (!($prm->getName() === 'node_arr' && $prm->isPassedByReference())) {
+                throw new $this->exceptionClass($error_message);
             }
             // $result parameter
             $prm = $params[++$pi];
             if (!($prm->getName() === 'result' && $prm->isPassedByReference())) {
-                throw new $this->ExceptionClass($error_message);
+                throw new $this->exceptionClass($error_message);
             }
             
             // all parameters are valid: add the new callback to the replacer array
@@ -358,7 +423,7 @@ class View
         }
         
         // glaring mistake: $replacer is not a function
-        throw new $this->ExceptionClass('The passed replacer is not a function.');
+        throw new $this->exceptionClass('The passed replacer is not a function.');
     }
     
     /**
@@ -447,11 +512,11 @@ class View
     private function outputHandlerColumn(string &$item_expression, array &$node_arr) : string
     {
         // use 'preg_replace' with callback
-        $item_string = preg_replace_callback(    // MAIN FUNCTION
-            $this->replacing_pattern,               // usually it is: "/\{\{([a-zA-Z%0-9][a-zA-Z0-9%]*)\}\}/U" or more clearly "/{{([a-zA-Z%0-9][a-zA-Z0-9%]*)}}/U". Examples, "{{title}}", "{{description}}", "{{%class-active%}}", "{{%active%}}", etc.
+        $item_string = preg_replace_callback(           // MAIN FUNCTION
+            $this->replacing_pattern,                   // usually it is: "/\{\{([a-zA-Z%0-9][a-zA-Z0-9%]*)\}\}/U" or more clearly "/{{([a-zA-Z%0-9][a-zA-Z0-9%]*)}}/U". Examples, "{{title}}", "{{description}}", "{{%class-active%}}", "{{%active%}}", etc.
             function ($matches) use (&$node_arr) {      // callback: will run for every occurence pattern {{...}} in $elem_expression
                 // pattern matches a replacing part and passes matches to this function
-                $replacing_part = &$matches[1];     // here the $replacing_part will be: 'title', 'description' or another column name etc.
+                $replacing_part = &$matches[1];         // here the $replacing_part will be: 'title', 'description' or another column name etc.
                 return $node_arr[$replacing_part];
             },
             $item_expression
@@ -473,11 +538,11 @@ class View
     private function outputHandlerReplacer(string &$item_expression, array &$node_arr) : string
     {
         // use 'preg_replace' with callback
-        $item_string = preg_replace_callback(    // MAIN FUNCTION
-            $this->replacing_pattern,               // usually it is: "/\{\{([a-zA-Z%0-9][a-zA-Z0-9%]*)\}\}/U" or more clearly "/{{([a-zA-Z%0-9][a-zA-Z0-9%]*)}}/U". Examples, "{{title}}", "{{description}}", "{{%class-active%}}", "{{%active%}}", etc.
+        $item_string = preg_replace_callback(           // MAIN FUNCTION
+            $this->replacing_pattern,                   // usually it is: "/\{\{([a-zA-Z%0-9][a-zA-Z0-9%]*)\}\}/U" or more clearly "/{{([a-zA-Z%0-9][a-zA-Z0-9%]*)}}/U". Examples, "{{title}}", "{{description}}", "{{%class-active%}}", "{{%active%}}", etc.
             function ($matches) use (&$node_arr) {      // callback: will run for every occurence pattern {{...}} in $elem_expression
                 // pattern matches a replacing part and passes matches to this function
-                $replacing_part = &$matches[1];     // here the $replacing_part will be: 'title', 'description', '%class-active%', '%active%', etc.
+                $replacing_part = &$matches[1];         // here the $replacing_part will be: 'title', 'description', '%class-active%', '%active%', etc.
                 // 1) a column expression. NOTE: if write: 'isset($this->tree[$id][$expr_content])' a result maybe FALSE, because value in cell can be NULL (but it is!), therefore is wrong to use this construction
                 if (array_key_exists($replacing_part, $node_arr)) {
                     return $node_arr[$replacing_part];

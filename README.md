@@ -13,31 +13,35 @@ require 'project/Arrays/autoloader.php';
 
 use Arrays\D2\Tree\AdjacencyList\Tree as AlTree;
 use Arrays\D2\Tree\AdjacencyList\Option as AlTreeOption;
+use Arrays\D2\Tree\View\Handler;
 use Arrays\D2\Tree\View\Replacer;
 
-function addTemplate($view)
+function getTemplate()
 {
-    // Here is use static template (but it can be loaded from DB, memory, disk, etc.)
+    // Here is used static template (but it can be loaded from DB, memory, disk, etc.)
     $template = [
         'splitter' => [
-            'start' => '{{', 
+            'start' => '{{',
             'end'   => '}}'
         ],
-        'wrapper' => '<div>{{}}</div>',
+        'wrapper' => '<nav>{{}}</nav>',
         'level' => [
             'block'     => '<ul>{{}}</ul>',
             'item'      => '<li>{{}}</li>',
-            'content'   => '<span {{%active%}} data-id="{{id}}" data-parentid="{{parent_id}}" numbering="{{numbering}}">{{%title%}}</span>'
-        ]
+            'content'   => '<a href="{{link}}"><span {{%active%}} data-id="{{id}}" data-parentid="{{parent_id}}" descendants="{{descendants}}" numbering="{{numbering}}">{{%title%}}</span></a>'
+        ],
+        0 => [
+            'item'      => '<li class="item-0">{{}}</li>',
+        ],
     ];
     
-    // Note: 'set' method requires the whole template and overrides view template, but 'add' 
-    // method overrides only passed template items (other items is taken from 
-    // '/Config/d2.tree.config.php' file 'view' key)
-    $view->set($template);
+    return $template;
 }
-function addReplacers($view)
+function getReplacers()
 {
+    // Replacers
+    $replacers = [];
+        
     // Replacer. Detects item with active link and mark it with 'class="active"' attribute
     $replacer = function (&$node_arr, &$result) : bool {
         if($node_arr['link'] === $this->uri) {
@@ -47,41 +51,61 @@ function addReplacers($view)
         return false;
     };
     $data = ['uri' => $_SERVER['REQUEST_URI']];
-    $view->addReplacer('%class-active%', new Replacer($replacer, $data));
-    
+    // Add replacer
+    $replacers['%class-active%'] = new Replacer($replacer, $data);
+        
     // Replacer. Handles every %title% in a node content and adds to its content some Font Awesome icon
     $replacer = function (&$node_arr, &$result) : bool {
         $result = $node_arr['title'] . ' <span class="fa fa-icon"></span>';
         return true;
     };
-    $view->addReplacer('%title%', new Replacer($replacer));
-    
-    // So will be replaced add {{%class-active%}} and {{%title%}} expressions. But default output 
-    // handler is 'Column', therefore allow handle not only column names.
-    $view->setOutputHandler('Replacer');
+    // Add replacer
+    $replacers['%title%'] = new Replacer($replacer);
+        
+    return $replacers;
 }
-
-// Outputs menu
 function echo_menu()
 {
-    // `tree` (`id`, `parent_id`, `title`, `hint`, `link`)
+    // `tree` table can be found in \data\tree.sql file
     $source = (new PDO('mysql:host=localhost;dbname=test', 'root', ''))
-        ->query('SELECT * from `tree`')
+        ->query('SELECT id, parent_id, title, link from `tree`')
         ->fetchAll(PDO::FETCH_ASSOC);
+    
     
     // Create a tree object, for build and output new tree
     $tree = new ALTree($source, 'id', 'parent_id');
-
-    $options = $tree->options;
+        
+    // Tree options
+    $options = $tree->options; // or $options = $tree->getOptions();
+        
+    // descendants
+    $options->set(AlTreeOption::COUNT_DESCENDANTS);
+    // numbering
     $options->set(ALTreeOption::NUMBERING);
+    // turn on debug mode
+    $options->set(ALTreeOption::DEBUG_MODE);
+        
+    // view
+    $view = $options->view;
     
-    $view = $tree->options->view;
-    addTemplate($view);
-    addReplacers($view);
+    // set or add a view template
+    $view->set( getTemplate() ); // or $view->add( getTemplate() );
+        
+    // add view replacers
+    foreach ( getReplacers() as $key => $replacer ) {
+        $view->addOutputReplacer($key, $replacer);
+    }
     
-    $tree->outputFast();
+    // So will be replaced {{%class-active%}} and {{%title%}} expressions. But
+    // default output handler is 'Column' (recognizes only column names), therefore
+    // allow to handle another expressions (like %title%).
+    $view->setOutputHandler(Handler::REPLACER);
+    
+    // Output
+    $tree->output(); // or $tree->outputFast();
 }
 
 // Menu output
 echo_menu();
+
 ```

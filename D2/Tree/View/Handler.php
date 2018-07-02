@@ -8,12 +8,9 @@ namespace Arrays\D2\Tree\View;
  * @link    https://github.com/AnatolyKlochko/Arrays
  * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
-class Inserter extends \stdClass
+class Handler
 {
-    public $inserter;
-    
-    public function __construct(\Closure $inserter, array $data = [])
-    {
-        
-    }
+    const COLUMN = 'Column';
+    const REPLACER = 'Replacer';
+    const INSERTER = 'Inserter';
 }

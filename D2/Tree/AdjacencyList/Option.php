@@ -21,26 +21,40 @@ use Arrays\Numbering\Numbering;
  */
 class Option extends _Option
 {
-    use Num;
     /**
      * A lot of constans, which is used to set a tree's options.
      */
     const COUNT_DESCENDANTS = 1;    // 0000 0000 0000 0001
-    const NUMBERING = 2;            // 0000 0001 0000 0010
-    const DEBUG_MODE = 8;           // 0001 0000 0000 1000
+    const NUMBERING = 2;            // 0000 0000 0000 0010
+    const DEBUG_MODE = 8;           // 0000 0000 0000 1000
     
-    public $view;
-    public $numbering;
     
-    public function __construct(int $options, $src_index, $src_parent)
+    private $tree;
+    
+
+    
+    public function __construct(Tree $tree, int $options)
     {
         // Call parent method
         parent::__construct($options);
         
-        // Init view
-        $this->view = new View($src_index, $src_parent);
-        
-        // Init numbering, will be loaded only default numerator 'Decimal'
-        $this->numbering = new Numbering();
+        // tree
+        $this->tree = $tree;
+    }
+    
+    public function __get($name)
+    {
+        switch ($name) {
+            case 'numbering':
+                // Init numbering, will be loaded only default numerator 'Decimal'
+                $nb = new Numbering();
+                $nb->setExceptionClass($this->tree->getExceptionClass());
+                $this->numbering = $nb;
+                return $this->numbering;
+            case 'view':
+                // Init view
+                $this->view = new View($this->tree);
+                return $this->view;
+        }        
     }
 }
