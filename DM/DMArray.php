@@ -3,11 +3,11 @@
  * 
  */
 
-namespace Arrays\DM;
+namespace Arrays;
 
 /*
- * DM means MultiDimensional arrays.
+ * 8 means infinity, multidimensional arrays
  */
-class DMArray {
+class Array8D {
     
 }

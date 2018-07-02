@@ -29,29 +29,10 @@ function autoloader($class)
     // does the class use the library namespace prefix?
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {
-        // no, move to the next registered autoloader
+        // sorry I am not Your al..., move to the next registered autoloader
         return false;
     }
-    
-    /**
-     * Loading indicator
-     * 
-     * Main goal: when will be loaded all library files, the loader remove 
-     * itself from PHP autoloader's stack.
-     * 
-     * Library list:
-     * 1a) D2\D2Array.php
-     * 1b) D2\Output.php
-     * 2a) D2\Tree\AjacencyList\Tree.php
-     * 3b) D2\Tree\OutputReplacer.php
-     * x) D2\Tree\OutputInserter.php, not implemented
-     * x) DM\Array.php, not implemented
-     
-     * total: 4 files.
-     */
-    static $total = 4;
-    static $loaded = 0;
-        
+            
     // get the relative class name
     $relative_class = substr($class, $len);
     
@@ -60,13 +41,7 @@ function autoloader($class)
          
     // if the file exists, require it
     if(file_exists($path)) {
-        require $path;
-               
-        // if was loaded all library files, removes itseft from PHP autoloader's stack
-        if ($total == ++$loaded) {
-           spl_autoload_unregister(__FUNCTION__);
-        }
-                
+        require $path;               
         return true;       
     }
     return false;

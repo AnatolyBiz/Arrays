@@ -12,78 +12,105 @@ Let's output some menu:
 require 'project/Arrays/autoloader.php';
 
 use Arrays\D2\Tree\AdjacencyList\Tree as AlTree;
-use Arrays\D2\Tree\OutputReplacer;
+use Arrays\D2\Tree\AdjacencyList\Option as AlTreeOption;
+use Arrays\D2\Tree\View\Handler;
+use Arrays\D2\Tree\View\Replacer;
 
+// A template for menu
+function getTemplate()
+{
+    // Here is used static template (but it can be loaded from DB, memory, disk, etc.)
+    $template = [
+        'splitter' => [
+            'start' => '{{',
+            'end'   => '}}'
+        ],
+        'wrapper' => '<nav>{{}}</nav>',
+        'level' => [
+            'block'     => '<ul>{{}}</ul>',
+            'item'      => '<li>{{}}</li>',
+            'content'   => '<a href="{{link}}"><span {{%active%}} data-id="{{id}}" data-parentid="{{parent_id}}" descendants="{{descendants}}" numbering="{{numbering}}">{{%title%}}</span></a>'
+        ],
+        0 => [
+            'item'      => '<li class="item-0">{{}}</li>',
+        ],
+    ];
+    
+    return $template;
+}
+
+// Few replacers to automatically replace some values
+function getReplacers()
+{
+    // Replacers
+    $replacers = [];
+        
+    // Replacer. Detects item with active link and mark it with 'class="active"' attribute
+    $replacer = function (&$node_arr, &$result) : bool {
+        if($node_arr['link'] === $this->uri) {
+            $result = 'class="active"';
+            return true;
+        }
+        return false;
+    };
+    $data = ['uri' => $_SERVER['REQUEST_URI']];
+    // Add replacer
+    $replacers['%class-active%'] = new Replacer($replacer, $data);
+        
+    // Replacer. Handles every %title% in a node content and adds to its content some Font Awesome icon
+    $replacer = function (&$node_arr, &$result) : bool {
+        $result = $node_arr['title'] . ' <span class="fa fa-icon"></span>';
+        return true;
+    };
+    // Add replacer
+    $replacers['%title%'] = new Replacer($replacer);
+        
+    return $replacers;
+}
+
+// Menu output function
 function echo_menu()
 {
-    // Get a raw tree array
+    // `tree` table can be found in \data\tree.sql file
     $source = (new PDO('mysql:host=localhost;dbname=test', 'root', ''))
-            //->query('SELECT * from `tree`')
-            ->query('SELECT * from `tree2` WHERE `id` < 300') //  
-            ->fetchAll(PDO::FETCH_ASSOC);
+        ->query('SELECT id, parent_id, title, link from `tree`')
+        ->fetchAll(PDO::FETCH_ASSOC);
+    
     
     // Create a tree object, for build and output new tree
     $tree = new AlTree($source, 'id', 'parent_id');
-    
-	
-    // Set a view settings for the tree dispaying
-    $cview['wrapper'] =           '<nav>{{}}</nav>';
-    $cview['level']['block'] =    '<ul data-level="{{level}}">{{}}</ul>';
-    $cview['level']['item'] =     '<li>{{}}</li>';
-    $cview['level']['content'] =  '<a class="{{%active%}}" href="{{link}}" data-id="{{id}}">{{%title%}}</a>';
-    $cview[0]['block'] =          '<ul class="menu" data-level="{{level}}">{{}}</ul>';
-    
-
-
-    // Optional. Add few callbacks to handle a node output:
-    // - a callback to mark active menu item ( using key is '%active%' ):
-    $tree->addReplacer(
-        '%active%',
-        new OutputReplacer(
-            function (&$node, &$result) : bool {
-                if($node['link'] === $this->uri) {
-                    $result = 'active';
-                    return TRUE;
-                }
-                return FALSE;
-            },
-            ['uri' => $_SERVER['REQUEST_URI']]
-        )
-    );
-    // - a callback to mark active menu item ( using key is '%class-active%' ):
-    $tree->addReplacer(
-        '%class-active%',
-        new OutputReplacer(
-            function (&$node, &$result) : bool {
-                if($node['link'] === $this->uri) {
-                    $result = 'class="active"';
-                    return TRUE;
-                }
-                return FALSE;
-            },
-            ['uri' => $_SERVER['REQUEST_URI']]		// this prm 'uri' inside closure will be $this->uri
-        )
-    );
-    // - a callback for prepare title of link:
-    $tree->addReplacer(
-        '%title%',
-        new OutputReplacer(
-            function (&$node, &$result) : bool {
-                $result = $node['title'] . ' <span class="fa fa-icon"></span>';
-                return TRUE;
-            }
-        )
-    );
         
-    // Build & Output (print) the new sorted tree
-    $tree->quicklyOutput($cview);
-    //$tree->output($cview); // bug exists
+    // Tree options
+    $options = $tree->options; // or $options = $tree->getOptions();
+        
+    // descendants
+    $options->set(AlTreeOption::COUNT_DESCENDANTS);
+    // numbering
+    $options->set(AlTreeOption::NUMBERING);
+    // turn on debug mode
+    $options->set(AlTreeOption::DEBUG_MODE);
+        
+    // view
+    $view = $options->view;
     
-    // Clear memory
-    unset($tree);
+    // set or add a view template
+    $view->set( getTemplate() ); // or $view->add( getTemplate() );
+        
+    // add view replacers
+    foreach ( getReplacers() as $key => $replacer ) {
+        $view->addOutputReplacer($key, $replacer);
+    }
     
+    // So will be replaced {{%class-active%}} and {{%title%}} expressions. But
+    // default output handler is 'Column' (recognizes only column names), therefore
+    // allow to handle another expressions (like %title%).
+    $view->setOutputHandler(Handler::REPLACER);
+    
+    // Output
+    $tree->output(); // or $tree->outputFast();
 }
 
 // Menu output
 echo_menu();
+
 ```

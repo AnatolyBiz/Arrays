@@ -14,7 +14,7 @@ namespace Arrays\D2;
  * 
  * @package Arrays
  * @link    https://github.com/AnatolyKlochko/Arrays
- * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
+ * @author Anatoly Klochko <anatoly.klochko@gmail.com>
  */
 class D2Array
 {

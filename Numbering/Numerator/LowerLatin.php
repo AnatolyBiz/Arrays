@@ -1,14 +1,10 @@
 <?php
 /**
  * NUMBERINGS.
- *
  * For initialize the numbering types array. It is a one of available a numbering types.
  * 
  * Nubmering type "LowerLatin".
- *
- * Example: 
- * a, b, c, ..., y, az, aa, ab, ...
- *
+ * Example: a, b, c, ..., y, az, aa, ab, ...
  * Is identical to "UpperLatin" numbering.
 */
 return function (int &$offset) : string {
