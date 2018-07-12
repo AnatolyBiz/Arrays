@@ -9,8 +9,9 @@
 namespace Arrays\D2\Tree\AdjacencyList;
 
 use Arrays\Option\Option as _Option;
-use Arrays\D2\Tree\View\View;
 use Arrays\Numbering\Numbering;
+use Arrays\D2\Tree\View\View;
+use Arrays\D2\Tree\AdjacencyList\Output\Output;
 
 /**
  * The Option class contains constants and another objects for Tree class.
@@ -55,6 +56,10 @@ class Option extends _Option
                 // Init view
                 $this->view = new View($this->tree);
                 return $this->view;
+            case 'output':
+                // Init output
+                $this->output = new Output($this->tree, $this->view);
+                return $this->output;
         }        
     }
 }

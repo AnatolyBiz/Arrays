@@ -1,14 +1,17 @@
 <?php
-namespace Arrays\D2\Tree;
+/**
+ * 
+ */
+namespace Arrays\D2\Tree\AdjacencyList\Output;
 
 /**
- * Used for an adding a node set to the current node while the tree outputting.
+ * .
  * 
  * @package Arrays
  * @link    https://github.com/AnatolyKlochko/Arrays
- * @author 	Anatoly Klochko <anatoly.klochko@gmail.com>
+ * @author  Anatoly Klochko <anatoly.klochko@gmail.com>
  */
-class OutputInserter extends \stdClass
+class Inserter extends \stdClass
 {
     public $inserter;
     

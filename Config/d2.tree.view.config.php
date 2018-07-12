@@ -34,6 +34,5 @@ return [
             'item'      => '<li data-next="{{next}}">{{}}</li>',
             'content'   => '<span>{{}}</span>'
         ]
-    ],
-    'replacing_pattern' => '[a-zA-Z0-9%_][a-zA-Z0-9%_]*', // [allowed first symbol][and next allowed symbols]*
+    ]
 ];
