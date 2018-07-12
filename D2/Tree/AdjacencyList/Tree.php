@@ -86,7 +86,7 @@ class Tree
      * @access private
      * @var array
      */
-    private $tree;
+    private $tree = [];
     
     /**
      * An array with a sorted tree. The sorted tree is a tree that cab be outputted
@@ -98,7 +98,7 @@ class Tree
      * @access private
      * @var array
      */
-    private $sorted;
+    private $sorted = [];
         
     /**
      * Id of first found a top node. Initialized by getFirstTopId method.
@@ -193,6 +193,10 @@ class Tree
         if ($options != 0)
             $this->options = new Option($this, $options);
     }
+    
+    /**
+     * Handles every requested undeclared property.
+     */
     public function __get($name)
     {
         if ($name == 'options') {
@@ -201,6 +205,20 @@ class Tree
         }
     }
         
+    /**
+     * Is used to get reference to property.
+     */
+    public function assign(string $prop, $object, string $obj_prop)
+    {
+        // tree array
+        if ($prop === 'tree') {
+            if (empty($this->tree))
+                $this->tree = [];
+        }
+        
+        $object->assignTo($obj_prop, $this->{$prop});
+    }
+    
     /**
      * Wrapper of 'source' method.
      */
@@ -301,6 +319,29 @@ class Tree
     /**
      * 
      */
+    public function getSrcNext()
+    {
+        return $this->src_next == null ? 'next' : $this->src_next;
+    }
+    
+    /**
+     * Returns count of levels of tree.
+     */
+    public function getLevels()
+    {
+        return $this->levels;
+    }
+    /**
+     * Sets count of levels of tree.
+     */
+    public function setLevels($value)
+    {
+        $this->levels = $value;
+    }
+    
+    /**
+     * 
+     */
     public function getTopIdent()
     {
         return $this->top_ident;
@@ -317,7 +358,7 @@ class Tree
     /**
      * 
      */
-    private function getOptionsArray() : array
+    public function getOptionsArray() : array
     {
         $opts = $this->options;
                
@@ -349,7 +390,7 @@ class Tree
      * 
      * @return mixed Value of 'id' field of a first top node.
      */
-    private function getFirstTopId()
+    public function getFirstTopId()
     {
         // seek a first top node, if property is empty
         if (! isset($this->first_top_id)) {
@@ -362,7 +403,7 @@ class Tree
             
             // any top node isn't found: no sense to continue the tree building
             if (! isset($this->first_top_id)) {
-                throw new $this->exceptionClass('Any top node isn\'t found (maybe a types mismatch).');
+                throw new $this->exceptionClass('Any top node isn\'t found (maybe a type mismatch).');
             }
         }
         
@@ -403,6 +444,14 @@ class Tree
     /**
      * 
      */
+    public function isBase()
+    {
+        return $this->is_base;
+    }
+    
+    /**
+     * 
+     */
     public function createBase() : self
     {
         // if a tree already built
@@ -423,6 +472,7 @@ class Tree
         }
         
         // save new tree
+        $this->tree = []; // overwise on the next line will be "Fatal error: Uncaught Error: Cannot assign by reference to overloaded object"
         $this->tree = &$tree;
         
         // mark the tree as prepared for a relations building
@@ -431,7 +481,15 @@ class Tree
         // chaining
         return $this;
     }
-        
+    
+    /**
+     * 
+     */
+    public function isRelationChildSibling()
+    {
+        return $this->is_relation_child_sibling;
+    }
+    
     /**
      * Sets 2 types of relations between nodes:
      * - 'who is a next sibling node'
@@ -572,49 +630,45 @@ class Tree
             return $this;
         }
 
-        // create tree base (additional fields)
+        // Build relations (additional fields)
         if (! $this->is_base) {
             $this->createBase();
         }
-        
-        // create relation 'child & sibling'
         if (! $this->is_relation_child_sibling) {
             $this->createRelationChildSibling();
         }
         
+        // Tree array
+        $tree = &$this->tree;
+        // tree node array
+        $node = [];
         
-        
-        // options
+        // Options
         list($is_descendants, $is_numbering, ) = $this->getOptionsArray();
         if ($is_numbering) {
             $nb = $this->options->numbering;
         }
         
-        // current node level
-        $level = 0;
-        // first node
+        // Level
+        $level = 0;    // current level
+                
+        // First node
+        $first_node = [];
         $first_id = $this->getFirstTopId();
-        $first_node = &$this->tree[$first_id];
-        // current node
-        $id = $first_id;
-        $node = &$first_node;
-        // previous node
-        $prev_id = $first_id;
-        //$prev_node = &$first_node; // useless
-        // up node (parent node)
-        $up_node;
-        
-        
-        // first top node
+        $first_node = &$tree[$first_id];
         $first_node['level'] = $level;
-        $first_node['added'] = true;
-        // additional
+        $first_node['added'] = true; // mark a node as added to a tree, to help determine a closure
         if ($is_numbering) {
-            $numbering = $nb->getNumbering($first_node['level'], $first_node['childNumber']);
-            $first_node['numbering'] = $numbering;
+            $first_node['numbering'] = $nb->getNumbering( $first_node['level'], $first_node['childNumber'] );
         }
         
-
+        // Current node
+        $id = $first_id;
+        $node = &$first_node;
+        $prev_id = $id;
+        $up_node = [];
+        
+        
         
         // Tree Building
         do {
@@ -622,7 +676,7 @@ class Tree
             if (! $this->getNextNode($id, $level)) {
                 break;
             } else {
-                $node = &$this->tree[$id];
+                $node = &$tree[$id];
             }
             
             
@@ -649,7 +703,7 @@ class Tree
             if ($is_numbering) {
                 // the full numbering symbol of the parent node (something like: '1', '1.1.3', 'A.1', 'A.B', etc.)
                 $parent_id = $node[$this->src_parent];
-                $parentNumbering = $this->tree[$parent_id]['numbering'];
+                $parentNumbering = $tree[$parent_id]['numbering'];
                 $node['numbering'] = $nb->getNumbering($node['level'], $node['childNumber'], $parentNumbering);
             }
             
@@ -673,9 +727,17 @@ class Tree
     }
     
     /**
+     * Setter for 'is_relation_next' property.
+     */
+    public function setRelationNext($value)
+    {
+        $this->is_relation_next = $value;
+    }
+    
+    /**
      * 
      */
-    private function getNextNode(&$id, &$level) : bool
+    public function getNextNode(&$id, &$level) : bool
     {
         $node = &$this->tree[$id];
         if (isset($node['firstChild'])) {
@@ -732,6 +794,32 @@ class Tree
     }
     
     /**
+     * Builds tree relations on the tree array.
+     */
+    public function build()
+    {
+        // create tree base (additional fields)
+        if (! $this->is_base) {
+            $this->createBase();
+        }
+        
+        // create relation 'child & sibling'
+        if (! $this->is_relation_child_sibling) {
+            $this->createRelationChildSibling();
+        }
+        
+        // create relation 'next'
+        if (! $this->is_relation_next) {
+            $this->createRelationNext(); // at now the tree is built and can be outputted       
+        }
+    }
+    
+    public function isBuild()
+    {
+        return $this->is_relation_next;
+    }
+        
+    /**
      * Returns the current raw tree.
      * 
      * @return null|array
@@ -774,20 +862,8 @@ class Tree
             return $this->sorted;
         }
         
-        // create tree base (additional fields)
-        if (! $this->is_base) {
-            $this->createBase();
-        }
-        
-        // create relation 'child & sibling'
-        if (! $this->is_relation_child_sibling) {
-            $this->createRelationChildSibling();
-        }
-        
-        // create relation 'next'
-        if (! $this->is_relation_next) {
-            $this->createRelationNext(); // at now the tree is built and can be outputted       
-        }
+        // build tree
+        $this->build();
         
         // make a new sorded array from a relational tree array
         $id = $this->getFirstTopId();
@@ -832,6 +908,25 @@ class Tree
     }
     
     /**
+     * 
+     */
+    private function getOutputObj(array $replacers = null, string $handler = null)
+    {
+        // Get an Output object
+        $output = $this->options->output;
+        
+        // add replacers
+        foreach ( $replacers as $key => $replacer ) {
+            //$view->addOutputReplacer($key, $replacer);
+            $output->addReplacer($key, $replacer);
+        }
+        // expressions handler. So will be replaced {{%class-active%}} and {{%title%}} expressions. But default output handler is 'Column' (recognizes only column names), therefore allow to handle another expressions (like %title%).
+        $output->setHandler($handler);
+        
+        return $output;
+    }
+    
+    /**
      * Outputs a relational tree (with do-while loop).
      * 
      * Total loops/iterates (at source array):
@@ -846,105 +941,10 @@ class Tree
      * @param array $cview  The array with custom user view settings.
      * @return void
      */
-    public function output()
+    public function output(array $replacers = null, string $handler = null)
     {
-        // create tree base (additional fields)
-        if (! $this->is_base) {
-            $this->createBase();
-        }
-        
-        // create relation 'child & sibling'
-        if (! $this->is_relation_child_sibling) {
-            $this->createRelationChildSibling();
-        }
-        
-        // create relation 'next'
-        if (! $this->is_relation_next) {
-            $this->createRelationNext(); // at now the tree is built and can be outputted       
-        }
-        
-        
-        
-        // the first top node: id
-        $first_id = $this->getFirstTopId();
-        $id = $first_id;
-        // the first top node: level
-        $out_level = $this->tree[$first_id]['level'];
-        $prev_level = $out_level;
-        
-        // the 'next' attribute
-        $next_attr = $this->src_next == null ? 'next' : $this->src_next;
-        
-        // view
-        $view = $this->options->view;
-        // add new levels and fills them with default values
-        $view->addLevels($this->levels);
-        
-        
-        // OUTPUT
-        
-        // output a open tag of a wrapper
-        echo $view->getWrapperStart($this->tree[$id]);
-        
-        // first node
-        // output an open tag of block
-        echo $view->getBlockStart($out_level, $this->tree[$first_id]);
-        // output an open tag of item
-        echo $view->getItemStart($out_level, $this->tree[$first_id]);
-        // output a tag of a content
-        echo $view->getContent($out_level, $this->tree[$first_id]);
-        // [output a close tag of a item: if a node has no children]
-        if ($this->tree[$id]['children'] == 0) {
-            echo $view->getItemEnd($out_level, $this->tree[$first_id]);
-        }
-        
-        do {
-            // get a next node
-            $id = $this->tree[$id][$next_attr];
-            if (is_null($id)) {
-                break; // the tree is outputted
-            }
-            
-            // get a level of the current node
-            $level = $this->tree[$id]['level'];
-            
-            if ($level > $prev_level) {
-                // the current node level is bigger, than a previous node level: output a open tag of a block
-                echo $view->getBlockStart($level, $this->tree[$id]);
-            }
-            
-            if (($lc = $level - $prev_level) < 0) {
-                // the current node level is less, than a previous node level: put one or few end tags for a view block and a view item
-                $lc = abs($lc);
-                for ($i = 1; $i <= $lc; $i++) {
-                    // output a close tag of a block
-                    echo $view->getBlockEnd($prev_level - $i, $this->tree[$id]); // here node_arr is ambiguous
-                    
-                    // output a close tag of a item
-                    echo $view->getItemEnd($prev_level - $i, $this->tree[$id]);
-                }
-            }
-            // output a open tag of a item
-            echo $view->getItemStart($level, $this->tree[$id]);
-
-            // output a tag of a content
-            echo $view->getContent($level, $this->tree[$id]);
-
-            // [output a close tag of a item: if a item has no children]
-            if ($this->tree[$id]['children'] == 0) {
-                echo $view->getItemEnd($level, $this->tree[$id]);
-            }
-
-            // save the level
-            $prev_level = $level;
-            // go to a 'next' node!...
-        } while (1);
-        
-        // output a close tag of a block
-        echo $view->getBlockEnd($out_level, $this->tree[$first_id]);
-        
-        // output a close tag of a wrapper
-        echo $view->getWrapperEnd($this->tree[$first_id]);
+        // output, performs output of tree
+        $this->getOutputObj($replacers, $handler)->write();
     }
         
     /**
@@ -962,157 +962,9 @@ class Tree
      * @param array $cview  An array with custom user settings of a view.
      * @return void
      */
-    public function outputFast()
+    public function outputFast(array $replacers = null, string $handler = null)
     {
-        // create tree base (additional fields)
-        if (! $this->is_base) {
-            $this->createBase();
-        }
-        
-        // create relation 'child & sibling'
-        if (! $this->is_relation_child_sibling) {
-            $this->createRelationChildSibling();
-        }
-        
-        
-        // options
-        list($is_descendants, $is_numbering, ) = $this->getOptionsArray();
-        if ($is_numbering) {
-            $nb = $this->options->numbering;
-        }
-
-
-        // level values
-        $level = 0; // current level
-        $out_level = $level; // out level
-        $prev_level = $level; // previous level
-
-        // if of first top node
-        $first_id = $this->getFirstTopId();
-        // a current and previous node id
-        $id = $first_id;
-        $prev_id = $first_id;
-        $first_node = &$this->tree[$id];
-        $node = &$this->tree[$id];
-        
-        // first node
-        $first_node['level'] = $level;
-        $first_node['added'] = true; // mark a node as added to a tree, to help determine a closure
-        if ($is_numbering) {
-            $numbering = $nb->getNumbering($first_node['level'], $first_node['childNumber']);
-            $first_node['numbering'] = $numbering;
-        }
-        
-        // view
-        $view = $this->options->view;
-        
-        
-        
-        
-        
-        // Output
-    
-        // output a open tag of a wrapper
-        echo $view->getWrapperStart($first_node);
-        
-        // if view settings for the current level will not be create, below in the 'get_elem_string' method PHP will throw a fatal
-        $view->addLevel($level);
-        
-        // first node
-        // output a open tag of a block
-        echo $view->getBlockStart($out_level, $first_node);
-        // output a open tag of a item
-        echo $view->getItemStart($out_level, $first_node);
-        // output a tag of a content
-        echo $view->getContent($out_level, $first_node);
-        // [output a close tag of a item: if a node has no children]
-        if ($node['children'] == 0) {
-            echo $view->getItemEnd($out_level, $first_node); // $node is 
-        }
-        
-        // The Tree Building & Outputting:
-        do {
-            
-            if (! $this->getNextNode($id, $level)) {
-                break;
-            } else {
-                $node = &$this->tree[$id];
-            }
-            
-            
-            // if a closure, stop the process
-            if ($node['added']) {
-                throw new $this->exceptionClass('Closure in the tree, a node (id: ' . $id . ') was added to the tree and is adding again.');
-            }
-            
-            // save a level of a node
-            $node['level'] = $level;
-            
-            // count tree levels
-            if ($level > $this->levels) {
-                $this->levels = $level;
-            }
-            
-            // save a current node as a 'next' node in a previous node (the 'next' relation)
-            $this->tree[$prev_id]['next'] = $id;
-            
-            // a current node becomes a previous node
-            $prev_id = $id;
-            
-            // mark a node as added
-            $node['added'] = true;
-            // numbering
-            if ($is_numbering) {
-                // the full numbering symbol of the parent node (something like: '1', '1.1.3', 'A.1', 'A.B', etc.)
-                $parent_id = $node[$this->src_parent];
-                $parentNumbering = $this->tree[$parent_id]['numbering'];
-                $node['numbering'] = $nb->getNumbering($node['level'], $node['childNumber'], $parentNumbering);
-            }
-
-            // OUTPUT
-            if ($level > $prev_level) {
-                // create view settings for a new level
-                $view->addLevel($level);
-                
-                // output a open tag of a block
-                echo $view->getBlockStart($level, $node);
-            } elseif (($lc = $level - $prev_level) < 0) {
-                // the current node level is less, than a previous node level: put one or few end tags for a view block and a view item
-                $lc = abs($lc);
-                for ($i = 1; $i <= $lc; $i++) {
-                    // output a close tag of a block
-                    echo $view->getBlockEnd($prev_level - $i, $node); // 
-                    
-                    // output a close tag of a item                    
-                    echo $view->getItemEnd($prev_level - $i, $node); // 
-                }
-            }
-            
-            // output a open tag of a item
-            echo $view->getItemStart($level, $node); // 
-
-            // output a tag of a content
-            echo $view->getContent($level, $node); // 
-
-            // [output a close tag of a item: if a item has no children]
-            if ($node['children'] == 0) {
-                echo $view->getItemEnd($level, $node); // 
-            }
-
-            // save the level
-            $prev_level = $level;
-            
-            // go to a 'next' node!...
-        } while(1);
-
-        // output a close tag of a block
-        echo $view->getBlockEnd($out_level, $first_node);
-        
-        // output a close tag of a wrapper
-        echo $view->getWrapperEnd($first_node);
-        //pm_end();
-        
-        // mark the tree as prepared to the output (has the 'next' relation)
-        $this->is_relation_next = true;
+        // output, performs output of tree
+        $this->getOutputObj($replacers, $handler)->writeFast();
     }
 }

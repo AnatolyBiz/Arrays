@@ -9,17 +9,20 @@ Now library is in development stage and not all its code is verified, tested and
 Let's output some menu:
 
 ```php
-require 'project/Arrays/autoloader.php';
+ini_set('error_reporting', E_ALL & ~E_NOTICE);
 
-use Arrays\D2\Tree\AdjacencyList\Tree as AlTree;
-use Arrays\D2\Tree\AdjacencyList\Option as AlTreeOption;
-use Arrays\D2\Tree\View\Handler;
-use Arrays\D2\Tree\View\Replacer;
+require './../project/Arrays/autoloader.php';
 
-// A template for menu
+use Arrays\D2\Tree\AdjacencyList\Tree as Tree;      // or AlTree
+use Arrays\D2\Tree\AdjacencyList\Option as Option;  // or AlTreeOption
+use Arrays\D2\Tree\AdjacencyList\Output\Handler;    
+use Arrays\D2\Tree\AdjacencyList\Output\Replacer;
+use Arrays\D2\D2Array;
+
+// Returns a template for menu
 function getTemplate()
 {
-    // Here is used static template (but it can be loaded from DB, memory, disk, etc.)
+    // Here is used static template (but it can be loaded from anywhere)
     $template = [
         'splitter' => [
             'start' => '{{',
@@ -39,7 +42,7 @@ function getTemplate()
     return $template;
 }
 
-// Few replacers to automatically replace some values
+// Returns few replacers to automatically replace some values
 function getReplacers()
 {
     // Replacers
@@ -68,49 +71,52 @@ function getReplacers()
     return $replacers;
 }
 
-// Menu output function
+// Outputs a menu
 function echo_menu()
 {
     // `tree` table can be found in \data\tree.sql file
     $source = (new PDO('mysql:host=localhost;dbname=test', 'root', ''))
-        ->query('SELECT id, parent_id, title, link from `tree`')
+        ->query('SELECT `id`, `parent_id`, `title`, `link` from `tree`')
         ->fetchAll(PDO::FETCH_ASSOC);
     
     
     // Create a tree object, for build and output new tree
-    $tree = new AlTree($source, 'id', 'parent_id');
+    $tree = new Tree($source, 'id', 'parent_id');
         
-    // Tree options
+    // Options
     $options = $tree->options; // or $options = $tree->getOptions();
-        
     // descendants
-    $options->set(AlTreeOption::COUNT_DESCENDANTS);
+    $options->set(Option::COUNT_DESCENDANTS);
     // numbering
-    $options->set(AlTreeOption::NUMBERING);
+    $options->set(Option::NUMBERING);
     // turn on debug mode
-    $options->set(AlTreeOption::DEBUG_MODE);
+    $options->set(Option::DEBUG_MODE);
         
-    // view
-    $view = $options->view;
+    // View
+    $options->view->set( getTemplate() ); //$options->view->add( getTemplate() );
     
-    // set or add a view template
-    $view->set( getTemplate() ); // or $view->add( getTemplate() );
+    // Tree output
+    $tree->outputFast( getReplacers(), Handler::REPLACER );
+    
+    
+    // Or use an Output object:
+    //$output = $options->output;
+    // add replacers
+    //foreach ( getReplacers() as $key => $replacer ) {
+    //    $output->addReplacer($key, $replacer);
+    //}
+    // expressions handler. So will be replaced {{%class-active%}} and {{%title%}} expressions. But default output handler is 'Column' (recognizes only column names), therefore allow to handle another expressions (like %title%).
+    //$output->setHandler(Handler::REPLACER);
+    // output, performs output of tree
+    //$output->write();
+    //$output->writeFast();
         
-    // add view replacers
-    foreach ( getReplacers() as $key => $replacer ) {
-        $view->addOutputReplacer($key, $replacer);
-    }
-    
-    // So will be replaced {{%class-active%}} and {{%title%}} expressions. But
-    // default output handler is 'Column' (recognizes only column names), therefore
-    // allow to handle another expressions (like %title%).
-    $view->setOutputHandler(Handler::REPLACER);
-    
-    // Output
-    $tree->output(); // or $tree->outputFast();
+    // or save output to a variable:
+    //$output->isBuffered(true);
+    //$output->write(); //$output->writeFast();
+    //$output_str = $output->get(); //or: //$output->saveTo($output_str);
 }
 
-// Menu output
 echo_menu();
 
 ```
